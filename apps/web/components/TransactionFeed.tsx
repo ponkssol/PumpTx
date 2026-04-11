@@ -13,7 +13,7 @@ import {
 } from './feed-column-layout';
 import styles from './TransactionFeed.module.css';
 
-const LABELS = ['time', 'token', 'sym', 'sol', 'mc', 'buyer', 'tx', 'links'] as const;
+const LABELS = ['time', 'token', 'sym', 'sol', 'mc', '24h vol', 'fdv', 'buyer', 'tx', 'links'] as const;
 
 const GAP_PX = 8;
 const COLS = FEED_COL_DEFAULTS.length;

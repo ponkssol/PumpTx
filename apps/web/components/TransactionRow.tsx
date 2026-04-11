@@ -25,6 +25,8 @@ export default function TransactionRow({ tx, columnWidths, animate, selected, on
   const buyerShort = wallet.length > 14 ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : wallet;
   const solSpent = safeFiniteNumber(tx.sol_spent);
   const mcUsd = safeFiniteNumber(tx.market_cap_usd);
+  const vol24Usd = safeFiniteNumber(tx.volume_24h_usd);
+  const fdvUsd = safeFiniteNumber(tx.fdv_usd);
 
   return (
     <article
@@ -70,12 +72,22 @@ export default function TransactionRow({ tx, columnWidths, animate, selected, on
       <div className={styles.cell} style={feedColumnFlexStyle(4, columnWidths)}>
         <span className={mcUsd > 0 ? styles.mc : styles.mc0}>{formatMarketCapUsd(tx.market_cap_usd)}</span>
       </div>
-      <div className={`${styles.cell} ${styles.cellBuyer}`} style={feedColumnFlexStyle(5, columnWidths)}>
+      <div className={styles.cell} style={feedColumnFlexStyle(5, columnWidths)}>
+        <span className={vol24Usd > 0 ? styles.mc : styles.mc0} title="24h volume (USD)">
+          {formatMarketCapUsd(tx.volume_24h_usd)}
+        </span>
+      </div>
+      <div className={styles.cell} style={feedColumnFlexStyle(6, columnWidths)}>
+        <span className={fdvUsd > 0 ? styles.mc : styles.mc0} title="Fully diluted valuation (USD)">
+          {formatMarketCapUsd(tx.fdv_usd)}
+        </span>
+      </div>
+      <div className={`${styles.cell} ${styles.cellBuyer}`} style={feedColumnFlexStyle(7, columnWidths)}>
         <span className={styles.buyer} title={wallet}>
           {buyerShort}
         </span>
       </div>
-      <div className={styles.cell} style={feedColumnFlexStyle(6, columnWidths)}>
+      <div className={styles.cell} style={feedColumnFlexStyle(8, columnWidths)}>
         <a
           className={styles.sigLink}
           href={tx.solscan_url}
@@ -89,7 +101,7 @@ export default function TransactionRow({ tx, columnWidths, animate, selected, on
       </div>
       <div
         className={`${styles.cell} ${styles.cellLinks}`}
-        style={feedColumnFlexStyle(7, columnWidths)}
+        style={feedColumnFlexStyle(9, columnWidths)}
         onClick={(e) => e.stopPropagation()}
       >
         <div className={styles.links}>
