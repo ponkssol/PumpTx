@@ -1,0 +1,105 @@
+.shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
+.query {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chromeRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.live {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) var(--bg-primary);
+}
+
+.viewport::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.viewport::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+.scrollInner {
+  /* +16px vs 820: room for links column (two icon buttons, no overflow under detail pane) */
+  min-width: max(100%, 836px);
+  --feed-cols: 72px minmax(100px, 1.35fr) 48px 54px 60px minmax(72px, 0.85fr) minmax(80px, 0.95fr) 60px;
+}
+
+.list {
+  width: 100%;
+  min-width: 0;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: var(--feed-cols);
+  gap: 0 8px;
+  align-items: center;
+  padding: 4px 8px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+}
+
+.header > div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty {
+  padding: 16px 10px;
+  color: var(--text-dim);
+  font-size: 11px;
+}

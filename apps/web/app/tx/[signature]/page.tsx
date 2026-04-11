@@ -1,0 +1,74 @@
+'use client';
+
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Transaction } from '@/lib/db';
+import TerminalHeader from '@/components/TerminalHeader';
+import TransactionDetail from '@/components/TransactionDetail';
+import styles from './page.module.css';
+
+export default function TxPage() {
+  const params = useParams<{ signature: string }>();
+  const signature = useMemo(() => decodeURIComponent(params.signature), [params.signature]);
+  const [tx, setTx] = useState<Transaction | null | undefined>(undefined);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const flash = useCallback((msg: string) => {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 2000);
+  }, []);
+
+  const onCopy = useCallback(
+    async (text: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        flash('// COPIED TO CLIPBOARD');
+      } catch {
+        flash('// COPY FAILED');
+      }
+    },
+    [flash],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/transactions/${encodeURIComponent(signature)}`, { cache: 'no-store' });
+        const data = await res.json();
+        if (cancelled) return;
+        if (res.status === 404) setTx(null);
+        else if (!res.ok) setTx(null);
+        else setTx(data as Transaction);
+      } catch {
+        if (!cancelled) setTx(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [signature]);
+
+  return (
+    <div className={styles.page}>
+      <TerminalHeader />
+      <main className={styles.main}>
+        <div className={styles.toolbar}>
+          <Link className={styles.back} href="/">
+            ← Back to feed
+          </Link>
+          <div className={styles.h}>Transaction detail</div>
+        </div>
+
+        {tx === undefined ? <div className={styles.loading}>// LOADING…</div> : null}
+        {tx === null ? (
+          <div className={styles.err}>// 404 — TRANSACTION NOT FOUND</div>
+        ) : null}
+        {tx ? <TransactionDetail tx={tx} onCopy={onCopy} /> : null}
+
+        {toast ? <div className={styles.toast}>{toast}</div> : null}
+      </main>
+    </div>
+  );
+}

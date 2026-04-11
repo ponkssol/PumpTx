@@ -1,0 +1,121 @@
+.page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 10;
+}
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: min(1600px, 100%);
+  margin-inline: auto;
+  padding-inline: var(--safe-inline);
+  padding-block: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.window {
+  flex: 1;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.dashboard {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(200px, 1fr) auto;
+  gap: 0;
+  min-height: min(78vh, 820px);
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
+@media (min-width: 1024px) {
+  .dashboard {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 38%);
+    grid-template-rows: 1fr;
+    min-height: min(78vh, 860px);
+  }
+
+  .paneDetail {
+    border-left: 1px solid var(--border);
+  }
+}
+
+.paneList,
+.paneDetail {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.paneList {
+  overflow: hidden;
+  /* Clip any paint bleed so wide rows never draw under the detail column */
+  contain: paint;
+}
+
+.paneDetail {
+  max-height: 70vh;
+}
+
+@media (min-width: 1024px) {
+  .paneDetail {
+    max-height: none;
+  }
+}
+
+.skel {
+  flex: 1;
+  min-height: 280px;
+  border: 1px solid var(--border);
+  background: repeating-linear-gradient(
+    90deg,
+    var(--bg-secondary) 0,
+    var(--bg-secondary) 12px,
+    var(--bg-card) 12px,
+    var(--bg-card) 24px
+  );
+  animation: shimmer 1.2s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    filter: brightness(1.08);
+  }
+}
+
+.statusBar {
+  margin-top: auto;
+  padding: 6px var(--safe-inline) max(8px, env(safe-area-inset-bottom, 8px));
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  border-top: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
+.toast {
+  position: fixed;
+  right: max(16px, var(--safe-inline));
+  bottom: max(16px, env(safe-area-inset-bottom, 16px));
+  z-index: 120;
+  max-width: min(360px, calc(100vw - 32px));
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-accent);
+  color: var(--accent-green);
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}

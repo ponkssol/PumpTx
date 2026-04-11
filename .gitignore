@@ -1,0 +1,10 @@
+node_modules/
+.next/
+out/
+dist/
+.env
+*.log
+pumptx.db
+pumptx.db-journal
+apps/bot/public/generated/*.png
+.DS_Store
