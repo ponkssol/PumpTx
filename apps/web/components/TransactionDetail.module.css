@@ -21,7 +21,7 @@
 /* Full tx page: merged details | share preview (when image exists). */
 .fullSplitPage {
   align-items: stretch;
-  gap: clamp(18px, 2.5vw, 28px);
+  gap: clamp(20px, 2.8vw, 40px);
 }
 
 .fullSplitPage.fullSplitSingle {
@@ -29,7 +29,7 @@
 }
 
 .fullSplitPage.fullSplitWithShare {
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.44fr);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.5fr);
 }
 
 .fullCol {
