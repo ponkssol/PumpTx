@@ -29,11 +29,19 @@ export default function DashboardDetailPanel({ tx, orphanSignature, feedEmpty, o
       <aside className={styles.aside} aria-label="transaction detail">
         <div className={styles.topBar}>
           <span className={styles.label}>// DETAIL</span>
+          {tx ? (
+            <Link className={styles.linkOut} href={`/tx/${encodeURIComponent(tx.signature)}`}>
+              NEWEST IN FEED →
+            </Link>
+          ) : null}
         </div>
-        <p className={styles.muted}>This row is not in the latest 50 results.</p>
-        <Link className={styles.linkOut} href={`/tx/${encodeURIComponent(orphanSignature)}`}>
-          OPEN FULL PAGE →
-        </Link>
+        <p className={styles.muted}>Selection is not in the latest 50 rows. The card below shows the newest buy in the feed.</p>
+        <div className={styles.orphanActions}>
+          <Link className={styles.linkOut} href={`/tx/${encodeURIComponent(orphanSignature)}`}>
+            OPEN SELECTED TX →
+          </Link>
+        </div>
+        {tx ? <TransactionDetail tx={tx} onCopy={onCopy} embedded /> : null}
       </aside>
     );
   }
@@ -44,7 +52,7 @@ export default function DashboardDetailPanel({ tx, orphanSignature, feedEmpty, o
         <div className={styles.topBar}>
           <span className={styles.label}>// DETAIL</span>
         </div>
-        <p className={styles.hint}>Select a row on the left. Double-click opens the full page.</p>
+        <p className={styles.hint}>Waiting for data. When buys load, the newest row appears here.</p>
       </aside>
     );
   }

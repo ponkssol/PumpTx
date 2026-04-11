@@ -28,6 +28,14 @@ export interface StatsRow {
   last_updated: string | null;
 }
 
+/** Minimal row for “same mint” history on tx detail (newest first). */
+export interface RecentBuySummary {
+  signature: string;
+  timestamp: string;
+  sol_spent: number;
+  buyer_wallet: string;
+}
+
 const DB_PATH = path.resolve(process.cwd(), '..', '..', 'pumptx.db');
 
 function open(): Database.Database {
@@ -51,6 +59,24 @@ export function getTxBySignature(signature: string): Transaction | undefined {
     return db.prepare('SELECT * FROM transactions WHERE signature = ?').get(signature) as
       | Transaction
       | undefined;
+  } finally {
+    db.close();
+  }
+}
+
+/** Other BUY rows for the same mint, newest first (excludes current signature). */
+export function getRecentBuysSameMint(tokenMint: string, excludeSignature: string, limit = 20): RecentBuySummary[] {
+  const db = open();
+  try {
+    return db
+      .prepare(
+        `SELECT signature, timestamp, sol_spent, buyer_wallet
+         FROM transactions
+         WHERE token_mint = ? AND signature != ?
+         ORDER BY id DESC
+         LIMIT ?`,
+      )
+      .all(tokenMint, excludeSignature, limit) as RecentBuySummary[];
   } finally {
     db.close();
   }

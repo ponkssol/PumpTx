@@ -7,6 +7,8 @@ const LOGO_PATH = path.join(__dirname, '..', 'templates', 'pumptx-logo.png');
 
 /** Sora stack — no double quotes inside (breaks SVG attrs). */
 const FONT = 'Sora, Segoe UI, system-ui, sans-serif';
+/** Monospace for full mint in CA card. */
+const FONT_MONO = 'Consolas, ui-monospace, SFMono-Regular, monospace';
 
 const W = 1200;
 const H = 630;
@@ -24,24 +26,19 @@ const C = {
   border: '#1f1f1f',
 };
 
-/** Layout grid (px). */
+/** Base layout (px); final Ys computed in generateImage so gaps never overlap glyphs. */
 const L = {
   pad: 48,
-  colVal: 340,
   yTime: 46,
-  ySym: 176,
-  yName: 218,
-  yMint: 252,
-  yBuyLbl: 286,
-  yHero: 354,
-  yPillTop: 386,
-  pillH: 60,
-  pillPadX: 26,
-  /** Tight stack under pill; baseline step (px). */
-  yStat0: 454,
-  statRow: 32,
-  footerTop: H - 58,
-  footerTextY: H - 18,
+  pillPadX: 24,
+  statRow: 36,
+  statCardPadTop: 26,
+  statCardPadBottom: 18,
+  statInnerPad: 20,
+  statLabelColW: 100,
+  statValueGap: 16,
+  footerBarH: 72,
+  footerTextInsetY: 28,
 };
 
 /** @param {string} t */
@@ -66,7 +63,7 @@ function clipRaw(s, max) {
 /** @param {number} n */
 function formatMc(n) {
   const x = Number(n);
-  if (!Number.isFinite(x) || x <= 0) return '—';
+  if (!Number.isFinite(x) || x <= 0) return 'N/A';
   if (x >= 1_000_000) return `$${(x / 1_000_000).toFixed(2)}M`;
   if (x >= 1000) return `$${Math.round(x / 1000)}K`;
   return `$${Math.round(x)}`;
@@ -98,24 +95,76 @@ async function generateImage(buyData) {
   const rx = W - L.pad;
   const tokenName = String(buyData.tokenName || 'Token').toUpperCase();
   const sym = String(buyData.tokenSymbol || '???').toUpperCase();
-  const mintShort = clip(`${buyData.tokenMint.slice(0, 6)}…${buyData.tokenMint.slice(-6)}`, 44);
+  const showSym = sym !== '???' && sym !== tokenName;
+  const mintFull = esc(String(buyData.tokenMint || ''));
   const solNum = esc(formatSol(Number(buyData.solSpent)));
   const mcStr = formatMc(buyData.marketCapUsd);
   const tokAmt = esc(clipRaw(String(buyData.tokenAmount ?? '—'), 32));
   const buyer = esc(clipRaw(String(buyData.buyerWalletShort || ''), 44));
   const sigS = esc(clipRaw(String(buyData.signatureShort || buyData.signature || ''), 52));
 
-  const pillW = W - L.pad * 2;
-  const pillCenterY = L.yPillTop + L.pillH / 2;
-  const pillTextY = pillCenterY + 7;
+  /** Left edge for amount + MC/CA + stat row (matches Bought/SOL card). */
+  const contentAlignX = L.pad - 10;
+  const innerW = W - contentAlignX - L.pad;
+  const cardGap = 12;
+  const mcCardW = Math.min(320, Math.floor(innerW * 0.3));
+  const caCardW = innerW - mcCardW - cardGap;
+  const mcCardX = contentAlignX;
+  const caCardX = contentAlignX + mcCardW + cardGap;
+  const footerTop = H - L.footerBarH;
+  const footerTextY = H - L.footerTextInsetY;
+
+  /** Stack baselines top→bottom; nudged down for balance (full CA lives in pill row, not under title). */
+  let y = 178;
+  const Y = {};
+  if (showSym) {
+    Y.ySym = y;
+    y += 38;
+  }
+  Y.yName = y;
+  /* Space below 36px title before the amount card (avoids overlap with “Bought”). */
+  y += 58;
+  Y.yBuyLbl = y;
+  /* “Bought” line + gap before 60px SOL numerals. */
+  y += 62;
+  Y.yHero = y;
+  y += 48;
+  Y.yPillTop = y;
+  Y.pillH = 44;
+  const pillEnd = Y.yPillTop + Y.pillH;
+  const gapAfterPill = 6;
+  const statCardTop = pillEnd + gapAfterPill;
+  const statFirstBaselineLead = 20;
+  Y.yStat0 = statCardTop + statFirstBaselineLead;
+  const yTok = Y.yStat0;
+  const yBuy = Y.yStat0 + L.statRow;
+  const yTx = Y.yStat0 + L.statRow * 2;
+  /** Slight nudge so 20px values optically center with 13px labels on same row. */
+  const vDy = 2;
+  const statCardH = yTx - statCardTop + 14 + L.statCardPadBottom + vDy;
+
+  const statLabelX = contentAlignX + L.statInnerPad;
+  const statValueX = statLabelX + L.statLabelColW + L.statValueGap;
+  const statCardW = innerW;
+
+  const pillTextY = Y.yPillTop + Y.pillH / 2 + 5;
+
+  /** Single card wrapping “Bought” label + SOL line (aligned insets, balanced padding). */
+  const amountPadX = 22;
+  const amountTextX = contentAlignX + amountPadX;
+  const amountCardX = contentAlignX;
+  const amountCardTop = Y.yBuyLbl - 22;
+  const amountCardBottom = Y.yHero + 26;
+  const amountCardH = amountCardBottom - amountCardTop;
+  const amountCardW = Math.min(528, innerW);
 
   const brandFallback = hasLogo
     ? ''
     : `<text x="${L.pad}" y="78" fill="${C.accent}" font-size="18" font-weight="800" font-family="${FONT}">[PumpTx]</text>`;
 
-  const yTok = L.yStat0;
-  const yBuy = L.yStat0 + L.statRow;
-  const yTx = L.yStat0 + L.statRow * 2;
+  const symSvg = showSym
+    ? `<text x="${L.pad}" y="${Y.ySym}" fill="${C.accent}" font-size="15" font-weight="700" font-family="${FONT}" letter-spacing="0.12em">${esc(sym)}</text>`
+    : '';
 
   const defs = `<defs>
 <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -142,6 +191,15 @@ async function generateImage(buyData) {
 <stop offset="48%" stop-color="${C.accent}"/>
 <stop offset="100%" stop-color="#009928"/>
 </linearGradient>
+<linearGradient id="amountCardFill" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#06180d" stop-opacity="0.94"/>
+<stop offset="55%" stop-color="#030a06" stop-opacity="0.97"/>
+<stop offset="100%" stop-color="#020403" stop-opacity="0.99"/>
+</linearGradient>
+<linearGradient id="boughtLabel" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0%" stop-color="#5cff8f"/>
+<stop offset="100%" stop-color="${C.accent}"/>
+</linearGradient>
 </defs>`;
 
   const body = `<?xml version="1.0" encoding="UTF-8"?>
@@ -153,31 +211,34 @@ ${defs}
 <rect width="${W}" height="${H}" fill="url(#veil)"/>
 ${brandFallback}
 <text x="${rx}" y="${L.yTime}" text-anchor="end" fill="${C.textMuted}" font-size="13" font-weight="500" font-family="${FONT}">${esc(buyData.timestamp)}</text>
-<text x="${L.pad}" y="${L.ySym}" fill="${C.accent}" font-size="15" font-weight="700" font-family="${FONT}" letter-spacing="0.12em">${esc(sym)}</text>
-<text x="${L.pad}" y="${L.yName}" fill="${C.text}" font-size="36" font-weight="800" font-family="${FONT}" letter-spacing="-0.02em">${clip(tokenName, 22)}</text>
-<text x="${L.pad}" y="${L.yMint}" fill="${C.textMuted}" font-size="16" font-weight="500" font-family="${FONT}">${mintShort}</text>
-<text x="${L.pad}" y="${L.yBuyLbl}" fill="${C.textDim}" font-size="13" font-weight="700" font-family="${FONT}" letter-spacing="0.14em">BUY</text>
-<text x="${L.pad}" y="${L.yHero}" font-family="${FONT}" font-weight="800">
-<tspan fill="url(#heroSol)" font-size="64" letter-spacing="-0.03em">${solNum}</tspan><tspan fill="${C.accentMuted}" font-size="26" font-weight="700"> SOL</tspan>
+${symSvg}
+<text x="${L.pad}" y="${Y.yName}" fill="${C.text}" font-size="36" font-weight="800" font-family="${FONT}" letter-spacing="-0.02em">${clip(tokenName, 22)}</text>
+<rect x="${amountCardX}" y="${amountCardTop}" rx="5" ry="5" width="${amountCardW}" height="${amountCardH}" fill="url(#amountCardFill)" stroke="rgba(0,255,65,0.28)" stroke-width="1"/>
+<text x="${amountTextX}" y="${Y.yBuyLbl}" fill="url(#boughtLabel)" font-size="16" font-weight="800" font-family="${FONT}" letter-spacing="0.04em">Bought</text>
+<text x="${amountTextX}" y="${Y.yHero}" font-family="${FONT}" font-weight="800">
+<tspan fill="url(#heroSol)" font-size="60" letter-spacing="-0.035em">${solNum}</tspan><tspan fill="${C.accentMuted}" font-size="24" font-weight="700" dx="10">SOL</tspan>
 </text>
-<rect x="${L.pad}" y="${L.yPillTop}" rx="26" ry="26" width="${pillW}" height="${L.pillH}" fill="rgba(0,255,65,0.1)" stroke="rgba(0,255,65,0.32)" stroke-width="1"/>
-<text x="${L.pad + L.pillPadX}" y="${pillTextY}" fill="#e8fff0" font-size="21" font-weight="700" font-family="${FONT}">Market cap · ${esc(mcStr)}</text>
-<text x="${L.pad}" y="${yTok}" fill="${C.textMuted}" font-size="16" font-weight="700" font-family="${FONT}" letter-spacing="0.08em">TOKENS</text>
-<text x="${L.colVal}" y="${yTok}" fill="${C.text}" font-size="22" font-weight="600" font-family="${FONT}">${tokAmt}</text>
-<text x="${L.pad}" y="${yBuy}" fill="${C.textMuted}" font-size="16" font-weight="700" font-family="${FONT}" letter-spacing="0.08em">BUYER</text>
-<text x="${L.colVal}" y="${yBuy}" fill="${C.text}" font-size="22" font-weight="600" font-family="${FONT}">${buyer}</text>
-<text x="${L.pad}" y="${yTx}" fill="${C.textMuted}" font-size="16" font-weight="700" font-family="${FONT}" letter-spacing="0.08em">TX</text>
-<text x="${L.colVal}" y="${yTx}" fill="${C.text}" font-size="21" font-weight="600" font-family="${FONT}">${sigS}</text>
-<rect x="0" y="${L.footerTop}" width="${W}" height="58" fill="rgba(0,0,0,0.5)"/>
-<text x="${L.pad}" y="${L.footerTextY}" fill="${C.textDim}" font-size="12" font-family="${FONT}">${clip(`pump.fun/coin/${buyData.tokenMint}`, 82)}</text>
-<text x="${rx}" y="${L.footerTextY}" text-anchor="end" fill="${C.accent}" font-size="13" font-weight="700" font-family="${FONT}">PumpTx</text>
+<rect x="${mcCardX}" y="${Y.yPillTop}" rx="4" ry="4" width="${mcCardW}" height="${Y.pillH}" fill="rgba(0,255,65,0.1)" stroke="rgba(0,255,65,0.32)" stroke-width="1"/>
+<rect x="${caCardX}" y="${Y.yPillTop}" rx="4" ry="4" width="${caCardW}" height="${Y.pillH}" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+<text x="${mcCardX + L.pillPadX}" y="${pillTextY}" fill="#e8fff0" font-size="18" font-weight="700" font-family="${FONT}">Market cap · ${esc(mcStr)}</text>
+<text x="${caCardX + L.pillPadX}" y="${pillTextY}" fill="${C.text}" font-size="14" font-weight="600" font-family="${FONT_MONO}" letter-spacing="-0.01em">${mintFull}</text>
+<rect x="${contentAlignX}" y="${statCardTop}" rx="4" ry="4" width="${statCardW}" height="${statCardH}" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+<text x="${statLabelX}" y="${yTok}" fill="${C.textDim}" font-size="13" font-weight="700" font-family="${FONT}" letter-spacing="0.12em">TOKENS</text>
+<text x="${statValueX}" y="${yTok + vDy}" fill="${C.text}" font-size="20" font-weight="600" font-family="${FONT}" font-variant-numeric="tabular-nums">${tokAmt}</text>
+<text x="${statLabelX}" y="${yBuy}" fill="${C.textDim}" font-size="13" font-weight="700" font-family="${FONT}" letter-spacing="0.12em">BUYER</text>
+<text x="${statValueX}" y="${yBuy + vDy}" fill="${C.text}" font-size="20" font-weight="600" font-family="${FONT}" font-variant-numeric="tabular-nums">${buyer}</text>
+<text x="${statLabelX}" y="${yTx}" fill="${C.textDim}" font-size="13" font-weight="700" font-family="${FONT}" letter-spacing="0.12em">TX</text>
+<text x="${statValueX}" y="${yTx + vDy}" fill="${C.text}" font-size="20" font-weight="600" font-family="${FONT}" font-variant-numeric="tabular-nums">${sigS}</text>
+<rect x="0" y="${footerTop}" width="${W}" height="${L.footerBarH}" fill="rgba(0,0,0,0.62)"/>
+<text x="${L.pad}" y="${footerTextY}" fill="${C.textMuted}" font-size="13" font-weight="500" font-family="${FONT}">${clip(`pump.fun/coin/${buyData.tokenMint}`, 76)}</text>
+<text x="${rx}" y="${footerTextY}" text-anchor="end" fill="${C.accent}" font-size="13" font-weight="700" font-family="${FONT}">PumpTx</text>
 </svg>`;
 
   let pipeline = sharp(Buffer.from(body)).png();
 
   if (hasLogo) {
-    const logoBuf = await sharp(LOGO_PATH).resize({ height: 42 }).ensureAlpha().png().toBuffer();
-    pipeline = pipeline.composite([{ input: logoBuf, left: L.pad, top: 62 }]);
+    const logoBuf = await sharp(LOGO_PATH).resize({ height: 26 }).ensureAlpha().png().toBuffer();
+    pipeline = pipeline.composite([{ input: logoBuf, left: L.pad, top: 56 }]);
   }
 
   await pipeline.toFile(filePath);

@@ -6,6 +6,226 @@
   overflow: hidden;
 }
 
+.fullPage {
+  width: 100%;
+  max-width: 100%;
+}
+
+.fullSplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(20px, 3vw, 36px);
+  align-items: start;
+}
+
+/* Full tx page: merged details | share preview (when image exists). */
+.fullSplitPage {
+  align-items: stretch;
+  gap: clamp(18px, 2.5vw, 28px);
+}
+
+.fullSplitPage.fullSplitSingle {
+  grid-template-columns: 1fr;
+}
+
+.fullSplitPage.fullSplitWithShare {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.44fr);
+}
+
+.fullCol {
+  min-width: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.2);
+  padding: clamp(12px, 1.8vw, 18px) clamp(12px, 2vw, 20px);
+}
+
+.fullColMerged {
+  padding-inline: clamp(14px, 2.2vw, 24px);
+}
+
+.fullColShare {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: clamp(12px, 1.6vw, 18px) clamp(12px, 1.8vw, 18px);
+}
+
+.shareCardFigure {
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  background: var(--bg-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.fullColShare .blockTitle {
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.shareCardFrame {
+  flex: 1;
+  min-height: clamp(120px, 22vh, 200px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 10px 12px;
+  background:
+    radial-gradient(ellipse 80% 70% at 50% 0%, rgba(0, 255, 65, 0.05), transparent 55%),
+    var(--bg-secondary);
+  box-sizing: border-box;
+}
+
+.shareCardImg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: min(42vh, 320px);
+  object-fit: contain;
+  object-position: center;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: #020202;
+}
+
+.blockSubtitle {
+  margin: 18px 0 10px;
+  padding: 14px 0 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.blockTitle {
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.recentSection {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.recentTitle {
+  margin: 0 0 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.recentList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.recentItem {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.recentItem:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.recentLink {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-green);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.recentLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.recentMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.recentSol {
+  color: var(--accent-green-muted);
+  font-weight: 600;
+}
+
+.recentSep {
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+.recentBuyer {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.02em;
+}
+
+.fullPage .row {
+  grid-template-columns: minmax(108px, 132px) 1fr;
+  gap: 8px 16px;
+  padding: 10px 0;
+}
+
+.fullColMerged .row {
+  grid-template-columns: minmax(108px, 132px) minmax(0, 1fr);
+}
+
+.fullPage .k {
+  font-size: 9px;
+  padding-top: 5px;
+}
+
+.fullPage .v {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.fullPage .sigLink {
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
 .panelHead {
   display: flex;
   flex-wrap: wrap;
@@ -14,14 +234,6 @@
   padding: clamp(14px, 2.2vw, 20px) clamp(16px, 2.5vw, 24px);
   background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-secondary) 100%);
   border-bottom: 1px solid var(--border);
-}
-
-.panelBrandLogo {
-  display: block;
-  height: 24px;
-  width: auto;
-  flex-shrink: 0;
-  object-fit: contain;
 }
 
 .title {
@@ -53,19 +265,6 @@
   padding: 8px 12px 10px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(165deg, rgba(0, 255, 65, 0.05) 0%, transparent 40%), var(--bg-elevated);
-}
-
-.embedBrandRow {
-  display: flex;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.embedBrandLogo {
-  display: block;
-  height: 22px;
-  width: auto;
-  object-fit: contain;
 }
 
 .embedTitleRow {
@@ -346,22 +545,6 @@
   box-sizing: border-box;
 }
 
-.canvasCapLeft {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.canvasBrandLogo {
-  display: block;
-  height: 16px;
-  width: auto;
-  flex-shrink: 0;
-  object-fit: contain;
-  opacity: 0.95;
-}
-
 .canvasCapLabel {
   font-size: 10px;
   font-weight: 600;
@@ -416,6 +599,24 @@
   padding: 12px 14px 14px;
 }
 
+@media (max-width: 900px) {
+  .fullSplit,
+  .fullSplitPage,
+  .fullSplitPage.fullSplitSingle,
+  .fullSplitPage.fullSplitWithShare {
+    grid-template-columns: 1fr;
+  }
+
+  .shareCardImg {
+    max-height: min(38vh, 280px);
+  }
+}
+
+.fullColMerged .sigLink {
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 @media (max-width: 560px) {
   .row {
     grid-template-columns: 1fr;
@@ -424,6 +625,10 @@
 
   .k {
     padding-top: 6px;
+  }
+
+  .fullPage .row {
+    grid-template-columns: 1fr;
   }
 
   .statStrip {

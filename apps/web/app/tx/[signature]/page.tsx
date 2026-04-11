@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Transaction } from '@/lib/db';
+import type { RecentBuySummary, Transaction } from '@/lib/db';
 import TerminalHeader from '@/components/TerminalHeader';
 import TransactionDetail from '@/components/TransactionDetail';
 import styles from './page.module.css';
@@ -12,6 +12,7 @@ export default function TxPage() {
   const params = useParams<{ signature: string }>();
   const signature = useMemo(() => decodeURIComponent(params.signature), [params.signature]);
   const [tx, setTx] = useState<Transaction | null | undefined>(undefined);
+  const [recentSameMint, setRecentSameMint] = useState<RecentBuySummary[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
   const flash = useCallback((msg: string) => {
@@ -38,11 +39,24 @@ export default function TxPage() {
         const res = await fetch(`/api/transactions/${encodeURIComponent(signature)}`, { cache: 'no-store' });
         const data = await res.json();
         if (cancelled) return;
-        if (res.status === 404) setTx(null);
-        else if (!res.ok) setTx(null);
-        else setTx(data as Transaction);
+        if (res.status === 404) {
+          setTx(null);
+          setRecentSameMint([]);
+        } else if (!res.ok) {
+          setTx(null);
+          setRecentSameMint([]);
+        } else {
+          const { recent_same_mint: recent, ...row } = data as Transaction & {
+            recent_same_mint?: RecentBuySummary[];
+          };
+          setTx(row as Transaction);
+          setRecentSameMint(Array.isArray(recent) ? recent : []);
+        }
       } catch {
-        if (!cancelled) setTx(null);
+        if (!cancelled) {
+          setTx(null);
+          setRecentSameMint([]);
+        }
       }
     })();
     return () => {
@@ -65,7 +79,7 @@ export default function TxPage() {
         {tx === null ? (
           <div className={styles.err}>// 404 — TRANSACTION NOT FOUND</div>
         ) : null}
-        {tx ? <TransactionDetail tx={tx} onCopy={onCopy} /> : null}
+        {tx ? <TransactionDetail tx={tx} recentSameMint={recentSameMint} onCopy={onCopy} /> : null}
 
         {toast ? <div className={styles.toast}>{toast}</div> : null}
       </main>

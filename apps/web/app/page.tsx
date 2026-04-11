@@ -29,6 +29,15 @@ export default function HomePage() {
     return txs.some((t) => t.signature === selectedSig) ? null : selectedSig;
   }, [txs, selectedSig]);
 
+  /** Detail: newest row until user picks a row; after pick, that row (orphan falls back to newest preview). */
+  const detailTx = useMemo(() => {
+    if (!txs.length) return null;
+    if (selectedSig === null || orphanSignature) return txs[0];
+    return selectedTx;
+  }, [txs, selectedSig, orphanSignature, selectedTx]);
+
+  const feedSelectedSignature = selectedSig ?? txs[0]?.signature ?? null;
+
   const flash = useCallback((msg: string) => {
     setToast(msg);
     window.setTimeout(() => setToast(null), 2000);
@@ -78,22 +87,16 @@ export default function HomePage() {
 
   useEffect(() => {
     if (loading) return;
-    if (!txs.length) {
-      setSelectedSig(null);
-      return;
-    }
-    if (selectedSig === null) {
-      setSelectedSig(txs[0].signature);
-    }
-  }, [loading, txs, selectedSig]);
+    if (!txs.length) setSelectedSig(null);
+  }, [loading, txs]);
 
   const statusLine = useMemo(() => {
     if (loading) return 'PumpTx · loading…';
     const n = txs.length;
-    const pos = selectedSig && selectedTx ? txs.findIndex((t) => t.signature === selectedSig) + 1 : 0;
+    const pos = detailTx ? txs.findIndex((t) => t.signature === detailTx.signature) + 1 : 0;
     const idx = pos > 0 ? `${pos}/${n}` : `—/${n}`;
     return `PumpTx · BUYS · ${idx} · poll 5s · ${stats.total_transactions} total`;
-  }, [loading, txs, selectedSig, selectedTx, stats.total_transactions]);
+  }, [loading, txs, detailTx, stats.total_transactions]);
 
   return (
     <div className={styles.page}>
@@ -108,13 +111,13 @@ export default function HomePage() {
                 <TransactionFeed
                   transactions={txs}
                   newestId={newestId}
-                  selectedSignature={selectedSig}
+                  selectedSignature={feedSelectedSignature}
                   onSelect={(t) => setSelectedSig(t.signature)}
                 />
               </div>
               <div className={styles.paneDetail}>
                 <DashboardDetailPanel
-                  tx={selectedTx}
+                  tx={detailTx}
                   orphanSignature={orphanSignature}
                   feedEmpty={!loading && txs.length === 0}
                   onCopy={onCopy}
