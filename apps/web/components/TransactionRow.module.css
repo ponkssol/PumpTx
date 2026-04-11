@@ -1,11 +1,9 @@
 .card {
-  display: grid;
-  grid-template-columns: var(
-    --feed-cols,
-    72px minmax(100px, 1.35fr) 48px 54px 60px minmax(72px, 0.85fr) minmax(80px, 0.95fr) 60px
-  );
-  gap: 0 8px;
+  display: flex;
   align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  gap: 0 8px;
   padding: 3px 8px;
   margin: 0;
   border: none;
@@ -15,7 +13,6 @@
   cursor: pointer;
   transition: background 0.1s ease;
   min-width: 0;
-  max-width: 100%;
 }
 
 .card:hover {
@@ -40,10 +37,24 @@
   overflow: hidden;
 }
 
+.cellToken {
+  gap: 8px;
+}
+
 .cellToken .token {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.tokenThumb {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
 }
 
 .time {

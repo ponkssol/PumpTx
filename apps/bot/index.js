@@ -53,10 +53,15 @@ async function onBuy(raw) {
   }
   let imgPath = null;
   let imgUrl = null;
+  /** @type {Buffer|null} */
+  let imgBuffer = null;
+  const shareImageMemory =
+    String(process.env.PUMPTX_SHARE_IMAGE_MODE || 'disk').toLowerCase() === 'memory';
   try {
-    const g = await generateImage(row);
+    const g = await generateImage(row, { persistToDisk: !shareImageMemory });
     imgPath = g.filePath;
     imgUrl = g.imageUrl;
+    imgBuffer = g.buffer;
   } catch (e) {
     log.warn(`Image generation failed: ${e.message}`);
   }
@@ -69,7 +74,7 @@ async function onBuy(raw) {
   await Promise.all([
     (async () => {
       try {
-        await notify(row, imgPath);
+        await notify(row, imgBuffer || imgPath);
         updateTelegramStatus(row.signature, 1);
       } catch (e) {
         log.error(`Telegram failed: ${e.message}`);
@@ -78,7 +83,7 @@ async function onBuy(raw) {
     })(),
     (async () => {
       try {
-        await tweet(row, imgPath);
+        await tweet(row, imgBuffer || imgPath);
         updateTweetStatus(row.signature, 1);
       } catch (e) {
         log.error(`Twitter failed: ${e.message}`);
@@ -93,6 +98,9 @@ async function main() {
   console.log(banner);
   validateEnv();
   initDb();
+  if (String(process.env.PUMPTX_SHARE_IMAGE_MODE || 'disk').toLowerCase() === 'memory') {
+    log.info('Share card: PUMPTX_SHARE_IMAGE_MODE=memory (PNG not written to disk; DB image_url empty)');
+  }
   const app = express();
   app.use(express.static(path.join(__dirname, 'public')));
   const port = Number(process.env.BOT_PORT);

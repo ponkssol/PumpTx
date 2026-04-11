@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { RecentBuySummary, Transaction } from '@/lib/db';
-import { safeFiniteNumber } from '@/lib/format';
+import { formatMarketCapUsd, safeFiniteNumber } from '@/lib/format';
 import styles from './TransactionDetail.module.css';
 
 type Props = {
@@ -25,19 +25,45 @@ function shortWallet(w: string) {
 export default function TransactionDetail({ tx, onCopy, embedded, recentSameMint = [] }: Props) {
   const solSpent = safeFiniteNumber(tx.sol_spent);
   const mcUsd = safeFiniteNumber(tx.market_cap_usd);
-  const mcDisplay = mcUsd > 0 ? `$${mcUsd}` : '$0';
+  const mcDisplay = formatMarketCapUsd(tx.market_cap_usd);
+  const volDisplay = formatMarketCapUsd(tx.volume_24h_usd ?? 0);
+  const fdvDisplay = formatMarketCapUsd(tx.fdv_usd ?? 0);
 
   return (
     <div className={`${styles.wrap} ${embedded ? styles.embedded : styles.fullPage}`}>
       {!embedded ? (
         <div className={styles.panelHead}>
-          <div className={styles.title}>
-            {tx.token_name} <span className={styles.sym}>[{tx.token_symbol}]</span>
+          <div className={styles.titleBlock}>
+            {tx.token_icon_url ? (
+              <img
+                className={styles.tokenThumb}
+                src={tx.token_icon_url}
+                alt=""
+                width={64}
+                height={64}
+                loading="lazy"
+                decoding="async"
+              />
+            ) : null}
+            <div className={styles.title}>
+              {tx.token_name} <span className={styles.sym}>[{tx.token_symbol}]</span>
+            </div>
           </div>
         </div>
       ) : (
         <header className={styles.embedHead}>
           <div className={styles.embedTitleRow}>
+            {tx.token_icon_url ? (
+              <img
+                className={styles.embedTokenThumb}
+                src={tx.token_icon_url}
+                alt=""
+                width={52}
+                height={52}
+                loading="lazy"
+                decoding="async"
+              />
+            ) : null}
             <h2 className={styles.tokenTitle}>{tx.token_name}</h2>
             <span className={styles.symBadge}>{tx.token_symbol}</span>
           </div>
@@ -57,6 +83,14 @@ export default function TransactionDetail({ tx, onCopy, embedded, recentSameMint
             <div className={styles.statItem}>
               <dt>MC</dt>
               <dd>{mcDisplay}</dd>
+            </div>
+            <div className={styles.statItem}>
+              <dt>24h vol</dt>
+              <dd>{volDisplay}</dd>
+            </div>
+            <div className={styles.statItem}>
+              <dt>FDV</dt>
+              <dd>{fdvDisplay}</dd>
             </div>
           </dl>
         </header>
@@ -142,6 +176,14 @@ export default function TransactionDetail({ tx, onCopy, embedded, recentSameMint
                 <div className={styles.v}>{mcDisplay}</div>
               </div>
               <div className={styles.row}>
+                <div className={styles.k}>24h volume</div>
+                <div className={styles.v}>{volDisplay}</div>
+              </div>
+              <div className={styles.row}>
+                <div className={styles.k}>FDV</div>
+                <div className={styles.v}>{fdvDisplay}</div>
+              </div>
+              <div className={styles.row}>
                 <div className={styles.k}>Row id</div>
                 <div className={styles.v}>{tx.id}</div>
               </div>
@@ -197,11 +239,6 @@ export default function TransactionDetail({ tx, onCopy, embedded, recentSameMint
           <a className={styles.btn} href={tx.solscan_url} target="_blank" rel="noreferrer">
             Solscan
           </a>
-        </div>
-
-        <div className={styles.sep} />
-
-        <div className={styles.actions}>
           <button
             type="button"
             className={styles.btn}

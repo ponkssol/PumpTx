@@ -33,8 +33,29 @@
 .chromeRight {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
+}
+
+.resetCols {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.resetCols:hover {
+  color: var(--accent-green);
+  border-color: var(--border-accent-dim);
+  background: rgba(0, 26, 8, 0.45);
 }
 
 .live {
@@ -64,9 +85,8 @@
 }
 
 .scrollInner {
-  /* +16px vs 820: room for links column (two icon buttons, no overflow under detail pane) */
-  min-width: max(100%, 836px);
-  --feed-cols: 72px minmax(100px, 1.35fr) 48px 54px 60px minmax(72px, 0.85fr) minmax(80px, 0.95fr) 60px;
+  box-sizing: border-box;
+  /* width 100% + minWidth inline: fill pane when wide, horizontal scroll when narrow */
 }
 
 .list {
@@ -75,16 +95,24 @@
 }
 
 .header {
-  display: grid;
-  grid-template-columns: var(--feed-cols);
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  box-sizing: border-box;
   gap: 0 8px;
-  align-items: center;
   padding: 4px 8px;
   position: sticky;
   top: 0;
   z-index: 2;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border);
+}
+
+.headerCell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
   color: var(--text-dim);
   font-size: 9px;
   font-weight: 700;
@@ -92,10 +120,37 @@
   text-transform: lowercase;
 }
 
-.header > div {
+.headerLabel {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+.colGrip {
+  position: absolute;
+  top: 0;
+  right: -6px;
+  width: 12px;
+  bottom: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 3;
+  flex-shrink: 0;
+}
+
+.colGrip:hover {
+  background: rgba(0, 255, 65, 0.08);
+}
+
+.colGrip:focus-visible {
+  outline: 1px solid var(--border-accent);
+  outline-offset: 0;
 }
 
 .empty {

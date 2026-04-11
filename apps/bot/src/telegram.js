@@ -1,5 +1,6 @@
 const fs = require('fs');
 const TelegramBot = require('node-telegram-bot-api');
+const { formatMarketCapUsd } = require('./format-mc');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -15,9 +16,9 @@ function escHtml(s) {
 
 /**
  * @param {object} buyData
- * @param {string|null} imagePath
+ * @param {string|Buffer|null} imagePathOrBuffer — filesystem path or in-memory PNG (no disk).
  */
-async function notify(buyData, imagePath) {
+async function notify(buyData, imagePathOrBuffer) {
   if (!bot || !chatId) throw new Error('Telegram not configured');
   const base = (process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '');
   const detailUrl = `${base}/tx/${buyData.signature}`;
@@ -27,7 +28,9 @@ async function notify(buyData, imagePath) {
     '',
     `🪙 <b>${escHtml(buyData.tokenName)}</b> (<code>${escHtml(buyData.tokenSymbol)}</code>)`,
     `💰 <b>SOL:</b> <code>${escHtml(String(buyData.solSpent))} SOL</code>`,
-    `📊 <b>MC:</b> <code>$${escHtml(String(buyData.marketCapUsd))}</code>`,
+    `📊 <b>MC:</b> <code>${escHtml(formatMarketCapUsd(buyData.marketCapUsd))}</code>`,
+    `📈 <b>24h vol:</b> <code>${escHtml(formatMarketCapUsd(buyData.volumeUsd24h ?? 0))}</code>`,
+    `💎 <b>FDV:</b> <code>${escHtml(formatMarketCapUsd(buyData.fdvUsd ?? 0))}</code>`,
     `📋 <b>CA:</b> <code>${escHtml(mint)}</code>`,
     `👛 <b>Buyer:</b> <code>${escHtml(buyData.buyerWalletShort || '')}</code>`,
     `🕐 ${buyData.timestamp}`,
@@ -36,8 +39,10 @@ async function notify(buyData, imagePath) {
     '',
     '<i>powered by PumpTx</i>',
   ].join('\n');
-  if (imagePath && fs.existsSync(imagePath)) {
-    await bot.sendPhoto(chatId, fs.createReadStream(imagePath), { caption: cap, parse_mode: 'HTML' });
+  if (Buffer.isBuffer(imagePathOrBuffer) && imagePathOrBuffer.length) {
+    await bot.sendPhoto(chatId, imagePathOrBuffer, { caption: cap, parse_mode: 'HTML' });
+  } else if (imagePathOrBuffer && typeof imagePathOrBuffer === 'string' && fs.existsSync(imagePathOrBuffer)) {
+    await bot.sendPhoto(chatId, fs.createReadStream(imagePathOrBuffer), { caption: cap, parse_mode: 'HTML' });
   } else {
     await bot.sendMessage(chatId, cap, { parse_mode: 'HTML', disable_web_page_preview: false });
   }

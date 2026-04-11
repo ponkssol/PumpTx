@@ -11,11 +11,17 @@ export interface Transaction {
   sol_spent: number;
   token_amount: number;
   market_cap_usd: number;
+  /** Approx. 24h traded notional (USD) from Jupiter / DexScreener. */
+  volume_24h_usd?: number | null;
+  /** Fully diluted valuation (USD) when available. */
+  fdv_usd?: number | null;
   timestamp: string;
   pump_fun_url: string;
   solscan_url: string;
   image_path: string | null;
   image_url: string | null;
+  /** Token logo URL from Jupiter / DexScreener metadata (not Helius). */
+  token_icon_url?: string | null;
   tweet_posted: number;
   telegram_sent: number;
   created_at: string;

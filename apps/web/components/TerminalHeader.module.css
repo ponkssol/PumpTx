@@ -2,43 +2,37 @@
   position: sticky;
   top: 0;
   z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  min-height: 48px;
-  padding-inline: var(--safe-inline);
-  padding-block: max(8px, env(safe-area-inset-top, 0px)) 8px;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border);
 }
 
-.left {
+/* Same horizontal rail as `main` (page / tx) so header aligns with dashboard content. */
+.inner {
+  width: 100%;
+  max-width: min(1920px, 100%);
+  margin-inline: auto;
+  padding-inline: var(--safe-inline);
+  padding-block: max(8px, env(safe-area-inset-top, 0px)) 8px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+  min-height: 48px;
+  box-sizing: border-box;
+}
+
+.lead {
+  display: flex;
+  align-items: center;
   min-width: 0;
 }
 
-.brandLogo {
-  display: block;
-  height: 26px;
-  width: auto;
-  flex-shrink: 0;
-  object-fit: contain;
-}
-
-.tag {
-  font-size: 11px;
-  color: var(--text-dim);
-  letter-spacing: 0.06em;
-}
-
-.right {
+.trail {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  margin-left: auto;
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary);
   font-size: 12px;
@@ -46,10 +40,15 @@
 
 .clock {
   color: var(--text-primary);
+  letter-spacing: 0.02em;
 }
 
-@media (max-width: 560px) {
-  .tag {
-    display: none;
-  }
+.brandLogo {
+  display: block;
+  height: 18px;
+  width: auto;
+  flex-shrink: 0;
+  object-fit: contain;
+  opacity: 0.95;
 }
+

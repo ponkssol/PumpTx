@@ -71,7 +71,7 @@
 
 .shareCardFrame {
   flex: 1;
-  min-height: clamp(120px, 22vh, 200px);
+  min-height: clamp(180px, 32vh, 280px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -87,7 +87,7 @@
   width: 100%;
   max-width: 100%;
   height: auto;
-  max-height: min(42vh, 320px);
+  max-height: min(52vh, 480px);
   object-fit: contain;
   object-position: center;
   border-radius: 4px;
@@ -236,6 +236,25 @@
   border-bottom: 1px solid var(--border);
 }
 
+.titleBlock {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 1.5vw, 16px);
+  flex: 1;
+  min-width: 0;
+}
+
+.tokenThumb {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
 .title {
   flex: 1;
   min-width: 0;
@@ -269,10 +288,20 @@
 
 .embedTitleRow {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
   gap: 6px 8px;
   margin-bottom: 8px;
+}
+
+.embedTokenThumb {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-primary);
 }
 
 .tokenTitle {
@@ -299,9 +328,15 @@
 
 .statStrip {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px 9px;
   margin: 0;
+}
+
+@media (max-width: 520px) {
+  .statStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .statItem {
@@ -459,10 +494,20 @@
 }
 
 .actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin-top: 2px;
+}
+
+@media (max-width: 640px) {
+  .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.embedded .actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .btn {
@@ -470,7 +515,8 @@
   border: 1px solid var(--border-accent-dim);
   background: transparent;
   color: var(--accent-green);
-  padding: 8px 12px;
+  padding: 9px 10px;
+  min-height: 38px;
   cursor: pointer;
   font-family: inherit;
   font-size: 9px;
@@ -481,6 +527,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
+  line-height: 1.15;
+  box-sizing: border-box;
+  width: 100%;
   transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
@@ -608,7 +658,7 @@
   }
 
   .shareCardImg {
-    max-height: min(38vh, 280px);
+    max-height: min(44vh, 360px);
   }
 }
 

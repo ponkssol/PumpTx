@@ -21,12 +21,13 @@ export default function TerminalHeader() {
 
   return (
     <header className={styles.bar}>
-      <div className={styles.left}>
-        <img className={styles.brandLogo} src="/pumptx-logo.png" alt="PumpTx" width={132} height={28} />
-        <span className={styles.tag}>pumpfun · buys</span>
-      </div>
-      <div className={styles.right}>
-        <span className={styles.clock}>{mounted ? formatNow(now) : '—'}</span>
+      <div className={styles.inner}>
+        <div className={styles.lead}>
+          <img className={styles.brandLogo} src="/pumptx-logo.png" alt="PumpTx" width={96} height={20} />
+        </div>
+        <div className={styles.trail}>
+          <span className={styles.clock}>{mounted ? formatNow(now) : '—'}</span>
+        </div>
       </div>
     </header>
   );

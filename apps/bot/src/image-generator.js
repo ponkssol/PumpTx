@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
+const { formatMarketCapUsd } = require('./format-mc');
 
 const OUT = path.join(__dirname, '..', 'public', 'generated');
 const LOGO_PATH = path.join(__dirname, '..', 'templates', 'pumptx-logo.png');
@@ -12,6 +13,10 @@ const FONT_MONO = 'Consolas, ui-monospace, SFMono-Regular, monospace';
 
 const W = 1200;
 const H = 630;
+
+/** Share-card token logo (px), upper-right beside “Bought” block. */
+const TOKEN_THUMB_PX = 162;
+const TOKEN_ICON_FETCH_MS = Number(process.env.TOKEN_ICON_FETCH_MS || process.env.METADATA_FETCH_MS || '4000');
 
 /** Theme-aligned with apps/web globals (dark + #00ff41). */
 const C = {
@@ -61,15 +66,6 @@ function clipRaw(s, max) {
 }
 
 /** @param {number} n */
-function formatMc(n) {
-  const x = Number(n);
-  if (!Number.isFinite(x) || x <= 0) return 'N/A';
-  if (x >= 1_000_000) return `$${(x / 1_000_000).toFixed(2)}M`;
-  if (x >= 1000) return `$${Math.round(x / 1000)}K`;
-  return `$${Math.round(x)}`;
-}
-
-/** @param {number} n */
 function formatSol(n) {
   const x = Number(n);
   if (!Number.isFinite(x) || x < 0) return '0';
@@ -80,16 +76,49 @@ function formatSol(n) {
 }
 
 /**
- * @param {object} buyData
- * @returns {Promise<{filePath: string, imageUrl: string}>}
+ * Fetches a remote token icon and returns a square PNG buffer for compositing.
+ * @param {string|undefined|null} url
+ * @param {number} size
+ * @returns {Promise<Buffer|null>}
  */
-async function generateImage(buyData) {
+async function tryLoadTokenIconPng(url, size) {
+  if (!url || typeof url !== 'string') return null;
+  const t = url.trim();
+  if (!t || t.length > 2048) return null;
+  if (!/^https?:\/\//i.test(t)) return null;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), TOKEN_ICON_FETCH_MS);
+  try {
+    const res = await fetch(t, {
+      signal: ac.signal,
+      headers: {
+        Accept: 'image/*,*/*',
+        'User-Agent': 'PumpTx-Bot/1.0 (share-card)',
+      },
+    });
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (!buf.length || buf.length > 6 * 1024 * 1024) return null;
+    return await sharp(buf)
+      .resize(size, size, { fit: 'cover' })
+      .ensureAlpha()
+      .png()
+      .toBuffer();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * @param {object} buyData
+ * @param {{ persistToDisk?: boolean }} [opts] — `persistToDisk: false` keeps PNG only in RAM (no `public/generated` files).
+ * @returns {Promise<{ filePath: string|null, imageUrl: string|null, buffer: Buffer|null }>}
+ */
+async function generateImage(buyData, opts = {}) {
+  const persistToDisk = opts.persistToDisk !== false;
   const baseUrl = (process.env.BOT_BASE_URL || `http://localhost:${process.env.BOT_PORT || 4000}`).replace(/\/$/, '');
-  fs.mkdirSync(OUT, { recursive: true });
-  const ts = Math.floor(Date.now() / 1000);
-  const m8 = buyData.tokenMint.slice(0, 8);
-  const fileName = `${ts}_${m8}.png`;
-  const filePath = path.join(OUT, fileName);
   const hasLogo = fs.existsSync(LOGO_PATH);
 
   const rx = W - L.pad;
@@ -98,9 +127,12 @@ async function generateImage(buyData) {
   const showSym = sym !== '???' && sym !== tokenName;
   const mintFull = esc(String(buyData.tokenMint || ''));
   const solNum = esc(formatSol(Number(buyData.solSpent)));
-  const mcStr = formatMc(buyData.marketCapUsd);
+  const mcStr = formatMarketCapUsd(buyData.marketCapUsd, { zeroLabel: 'N/A' });
   const tokAmt = esc(clipRaw(String(buyData.tokenAmount ?? '—'), 32));
-  const buyer = esc(clipRaw(String(buyData.buyerWalletShort || ''), 44));
+  const buyerWalletStr = String(buyData.buyerWallet || buyData.buyerWalletShort || '');
+  const buyer = esc(buyerWalletStr);
+  /** Full wallet in mono; slightly smaller if unusually long. */
+  const buyerFontPx = buyerWalletStr.length > 48 ? 16 : buyerWalletStr.length > 44 ? 17 : 19;
   const sigS = esc(clipRaw(String(buyData.signatureShort || buyData.signature || ''), 52));
 
   /** Left edge for amount + MC/CA + stat row (matches Bought/SOL card). */
@@ -157,6 +189,18 @@ async function generateImage(buyData) {
   const amountCardBottom = Y.yHero + 26;
   const amountCardH = amountCardBottom - amountCardTop;
   const amountCardW = Math.min(528, innerW);
+
+  /** Upper-right token logo: right-aligned with page padding, vertically centered on “Bought” card. */
+  const tokenThumbLeft = rx - TOKEN_THUMB_PX;
+  const pillGuard = Y.yPillTop - 10;
+  let tokenThumbTop = Math.round(amountCardTop + (amountCardH - TOKEN_THUMB_PX) / 2);
+  if (tokenThumbTop < 58) tokenThumbTop = 58;
+  if (tokenThumbTop + TOKEN_THUMB_PX > pillGuard) {
+    tokenThumbTop = Math.max(58, pillGuard - TOKEN_THUMB_PX);
+  }
+  if (tokenThumbTop + TOKEN_THUMB_PX > footerTop - 12) {
+    tokenThumbTop = Math.max(58, footerTop - 12 - TOKEN_THUMB_PX);
+  }
 
   const brandFallback = hasLogo
     ? ''
@@ -226,7 +270,7 @@ ${symSvg}
 <text x="${statLabelX}" y="${yTok}" fill="${C.textDim}" font-size="13" font-weight="700" font-family="${FONT}" letter-spacing="0.12em">TOKENS</text>
 <text x="${statValueX}" y="${yTok + vDy}" fill="${C.text}" font-size="20" font-weight="600" font-family="${FONT}" font-variant-numeric="tabular-nums">${tokAmt}</text>
 <text x="${statLabelX}" y="${yBuy}" fill="${C.textDim}" font-size="13" font-weight="700" font-family="${FONT}" letter-spacing="0.12em">BUYER</text>
-<text x="${statValueX}" y="${yBuy + vDy}" fill="${C.text}" font-size="20" font-weight="600" font-family="${FONT}" font-variant-numeric="tabular-nums">${buyer}</text>
+<text x="${statValueX}" y="${yBuy + vDy}" fill="${C.text}" font-size="${buyerFontPx}" font-weight="600" font-family="${FONT_MONO}" letter-spacing="-0.02em">${buyer}</text>
 <text x="${statLabelX}" y="${yTx}" fill="${C.textDim}" font-size="13" font-weight="700" font-family="${FONT}" letter-spacing="0.12em">TX</text>
 <text x="${statValueX}" y="${yTx + vDy}" fill="${C.text}" font-size="20" font-weight="600" font-family="${FONT}" font-variant-numeric="tabular-nums">${sigS}</text>
 <rect x="0" y="${footerTop}" width="${W}" height="${L.footerBarH}" fill="rgba(0,0,0,0.62)"/>
@@ -236,13 +280,35 @@ ${symSvg}
 
   let pipeline = sharp(Buffer.from(body)).png();
 
+  /** @type {{ input: Buffer, left: number, top: number }[]} */
+  const overlays = [];
+
   if (hasLogo) {
     const logoBuf = await sharp(LOGO_PATH).resize({ height: 26 }).ensureAlpha().png().toBuffer();
-    pipeline = pipeline.composite([{ input: logoBuf, left: L.pad, top: 56 }]);
+    overlays.push({ input: logoBuf, left: L.pad, top: 56 });
   }
 
-  await pipeline.toFile(filePath);
-  return { filePath, imageUrl: `${baseUrl}/generated/${fileName}` };
+  const tokenPng = await tryLoadTokenIconPng(buyData.tokenIconUrl, TOKEN_THUMB_PX);
+  if (tokenPng) {
+    overlays.push({ input: tokenPng, left: tokenThumbLeft, top: tokenThumbTop });
+  }
+
+  if (overlays.length) {
+    pipeline = pipeline.composite(overlays);
+  }
+
+  if (persistToDisk) {
+    fs.mkdirSync(OUT, { recursive: true });
+    const ts = Math.floor(Date.now() / 1000);
+    const m8 = buyData.tokenMint.slice(0, 8);
+    const fileName = `${ts}_${m8}.png`;
+    const filePath = path.join(OUT, fileName);
+    await pipeline.toFile(filePath);
+    return { filePath, imageUrl: `${baseUrl}/generated/${fileName}`, buffer: null };
+  }
+
+  const buffer = await pipeline.png().toBuffer();
+  return { filePath: null, imageUrl: null, buffer };
 }
 
 module.exports = { generateImage };

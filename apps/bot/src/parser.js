@@ -110,6 +110,8 @@ function parseBuyTx(tx) {
     solSpent,
     tokenAmount,
     marketCapUsd: 0,
+    volumeUsd24h: 0,
+    fdvUsd: 0,
     timestamp,
     pumpFunUrl: `https://pump.fun/coin/${mint}`,
     solscanUrl: `https://solscan.io/tx/${sig}`,

@@ -24,11 +24,14 @@ function initDb() {
       sol_spent REAL NOT NULL,
       token_amount REAL NOT NULL,
       market_cap_usd REAL DEFAULT 0,
+      volume_24h_usd REAL DEFAULT 0,
+      fdv_usd REAL DEFAULT 0,
       timestamp TEXT NOT NULL,
       pump_fun_url TEXT NOT NULL,
       solscan_url TEXT NOT NULL,
       image_path TEXT,
       image_url TEXT,
+      token_icon_url TEXT,
       tweet_posted INTEGER DEFAULT 0,
       telegram_sent INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
@@ -44,6 +47,17 @@ function initDb() {
     CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);
     INSERT OR IGNORE INTO stats (id) VALUES (1);
   `);
+  const cols = db.prepare('PRAGMA table_info(transactions)').all();
+  const colNames = new Set(cols.map((c) => c.name));
+  if (!colNames.has('token_icon_url')) {
+    db.exec('ALTER TABLE transactions ADD COLUMN token_icon_url TEXT');
+  }
+  if (!colNames.has('volume_24h_usd')) {
+    db.exec('ALTER TABLE transactions ADD COLUMN volume_24h_usd REAL DEFAULT 0');
+  }
+  if (!colNames.has('fdv_usd')) {
+    db.exec('ALTER TABLE transactions ADD COLUMN fdv_usd REAL DEFAULT 0');
+  }
 }
 
 /**
@@ -55,9 +69,9 @@ function saveTx(buyData, imageUrl, imagePath) {
   const stmt = getDb().prepare(`
     INSERT INTO transactions (
       signature, token_mint, token_symbol, token_name, buyer_wallet,
-      sol_spent, token_amount, market_cap_usd, timestamp, pump_fun_url,
-      solscan_url, image_path, image_url
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+      sol_spent, token_amount, market_cap_usd, volume_24h_usd, fdv_usd, timestamp, pump_fun_url,
+      solscan_url, image_path, image_url, token_icon_url
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `);
   stmt.run(
     buyData.signature,
@@ -68,11 +82,14 @@ function saveTx(buyData, imageUrl, imagePath) {
     buyData.solSpent,
     buyData.tokenAmount,
     buyData.marketCapUsd,
+    buyData.volumeUsd24h ?? 0,
+    buyData.fdvUsd ?? 0,
     buyData.timestamp,
     buyData.pumpFunUrl,
     buyData.solscanUrl,
     imagePath,
     imageUrl,
+    buyData.tokenIconUrl ?? null,
   );
 }
 

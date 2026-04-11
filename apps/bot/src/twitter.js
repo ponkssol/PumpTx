@@ -1,15 +1,16 @@
 const fs = require('fs');
 const axios = require('axios');
 const FormData = require('form-data');
+const { formatMarketCapUsd } = require('./format-mc');
 
 const KEY = process.env.TWITTER_API_IO_KEY;
 const BASE = (process.env.TWITTERAPI_IO_BASE_URL || 'https://api.twitterapi.io').replace(/\/$/, '');
 
 /**
  * @param {object} buyData
- * @param {string|null} imagePath
+ * @param {string|Buffer|null} imagePathOrBuffer — filesystem path or in-memory PNG.
  */
-async function tweet(buyData, imagePath) {
+async function tweet(buyData, imagePathOrBuffer) {
   if (!KEY) throw new Error('TWITTER_API_IO_KEY missing');
   const detailUrl = `${(process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '')}/tx/${buyData.signature}`;
   const text = [
@@ -17,7 +18,9 @@ async function tweet(buyData, imagePath) {
     '',
     `🪙 ${buyData.tokenName} (${buyData.tokenSymbol})`,
     `💰 ${buyData.solSpent} SOL`,
-    `📊 MC: $${buyData.marketCapUsd}`,
+    `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)}`,
+    `📈 24h vol: ${formatMarketCapUsd(buyData.volumeUsd24h ?? 0)}`,
+    `💎 FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`,
     '',
     `🔗 ${detailUrl}`,
     '',
@@ -27,9 +30,18 @@ async function tweet(buyData, imagePath) {
   const postOnce = async () => {
     /** @type {string[]} */
     const mediaIds = [];
-    if (imagePath && fs.existsSync(imagePath)) {
+    if (Buffer.isBuffer(imagePathOrBuffer) && imagePathOrBuffer.length) {
       const fd = new FormData();
-      fd.append('file', fs.createReadStream(imagePath));
+      fd.append('file', imagePathOrBuffer, { filename: 'pumptx.png', contentType: 'image/png' });
+      const up = await axios.post(`${BASE}/twitter/upload/media`, fd, {
+        headers: { ...fd.getHeaders(), 'X-API-Key': KEY },
+        maxBodyLength: Infinity,
+      });
+      const id = up.data?.media_id || up.data?.data?.media_id || up.data?.id;
+      if (id) mediaIds.push(String(id));
+    } else if (imagePathOrBuffer && typeof imagePathOrBuffer === 'string' && fs.existsSync(imagePathOrBuffer)) {
+      const fd = new FormData();
+      fd.append('file', fs.createReadStream(imagePathOrBuffer));
       const up = await axios.post(`${BASE}/twitter/upload/media`, fd, {
         headers: { ...fd.getHeaders(), 'X-API-Key': KEY },
         maxBodyLength: Infinity,
