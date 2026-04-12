@@ -1,0 +1,248 @@
+const { formatMarketCapUsd } = require('./format-mc');
+const { formatBuyerWalletPreview } = require('./parser');
+
+const AUTHOR_GITHUB_URL = 'https://github.com/ponkssol';
+
+/** X post body must stay under ~280 characters (API error 186). */
+const CHAR_MAX = Number(process.env.TWITTER_CHAR_MAX || 280);
+
+/** @param {string} s @param {number} max */
+function trunc(s, max) {
+  const t = String(s);
+  if (t.length <= max) return t;
+  return `${t.slice(0, Math.max(1, max - 1))}…`;
+}
+
+/**
+ * Same structure as Telegram caption (see `telegram.js`), plain text for Twitter.
+ * @param {object} o
+ * @param {string} o.name
+ * @param {string} o.sym
+ * @param {string} o.mint
+ * @param {string} o.buyer
+ * @param {string} o.linkRow
+ * @param {boolean} o.withFooter
+ * @param {object} buyData
+ */
+function buildPumptxBuyPlainBlock(o, buyData) {
+  const parts = [
+    '🚀 PUMPTX — BUY DETECTED',
+    '',
+    `🏛️ ${o.name} ( ${o.sym} )`,
+    `💰 SOL: ${String(buyData.solSpent)} SOL`,
+    `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)}`,
+    `📈 24h vol: ${formatMarketCapUsd(buyData.volumeUsd24h ?? 0)}`,
+    `💎 FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`,
+    `📋 CA: ${o.mint}`,
+    `👛 Buyer: ${o.buyer}`,
+    `🕒 ${buyData.timestamp}`,
+    '',
+    o.linkRow,
+  ];
+  if (o.withFooter) {
+    parts.push('');
+    parts.push(`powered by PumpTx · by ponks ${AUTHOR_GITHUB_URL}`);
+  }
+  return parts.join('\n');
+}
+
+/**
+ * Same labels as full block but MC / 24h vol / FDV on one line (fits Solana tx URLs on X).
+ * @param {object} o
+ * @param {object} buyData
+ */
+function buildPumptxBuyCompactPlainBlock(o, buyData) {
+  const statsLine = `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)} | 24h vol: ${formatMarketCapUsd(
+    buyData.volumeUsd24h ?? 0,
+  )} | FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`;
+  const parts = [
+    '🚀 PUMPTX — BUY DETECTED',
+    '',
+    `🏛️ ${o.name} ( ${o.sym} )`,
+    `💰 SOL: ${String(buyData.solSpent)} SOL`,
+    statsLine,
+    `📋 CA: ${o.mint}`,
+    `👛 Buyer: ${o.buyer}`,
+    `🕒 ${buyData.timestamp}`,
+    '',
+    o.linkRow,
+  ];
+  if (o.withFooter) {
+    parts.push('');
+    parts.push(`powered by PumpTx · by ponks ${AUTHOR_GITHUB_URL}`);
+  }
+  return parts.join('\n');
+}
+
+/**
+ * Last resort under X length cap: compact stats, optional no buyer row, short link prefix.
+ * @param {object} o
+ * @param {object} buyData
+ * @param {{ includeBuyer: boolean, tsMax: number, statsStyle?: 'full'|'mini' }} opts
+ */
+function buildPumptxBuyMicroPlainBlock(o, buyData, opts) {
+  const statsLine =
+    opts.statsStyle === 'mini'
+      ? `📊 ${formatMarketCapUsd(buyData.marketCapUsd)} · vol ${formatMarketCapUsd(
+          buyData.volumeUsd24h ?? 0,
+        )} · FDV ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`
+      : `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)} | 24h vol: ${formatMarketCapUsd(
+          buyData.volumeUsd24h ?? 0,
+        )} | FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`;
+  const ts = trunc(String(buyData.timestamp || ''), opts.tsMax);
+  const parts = [
+    '🚀 PUMPTX — BUY DETECTED',
+    '',
+    `🏛️ ${o.name} ( ${o.sym} )`,
+    `💰 SOL: ${String(buyData.solSpent)} SOL`,
+    statsLine,
+    `📋 CA: ${o.mint}`,
+  ];
+  if (opts.includeBuyer) parts.push(`👛 Buyer: ${o.buyer}`);
+  parts.push(`🕒 ${ts}`, '', o.linkRow);
+  return parts.join('\n');
+}
+
+/**
+ * Telegram-style BUY card in plain text (for X). Tiers shrink labels/CA/buyer/links until under CHAR_MAX.
+ * @param {object} buyData
+ * @returns {string}
+ */
+function buildTwitterSafePlainText(buyData) {
+  const base = (process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '');
+  const detailUrl = `${base}/tx/${buyData.signature}`;
+  const mintFull = String(buyData.tokenMint || '');
+  const pump = String(buyData.pumpFunUrl || '');
+  const scan = String(buyData.solscanUrl || '');
+  const name0 = String(buyData.tokenName || '');
+  const sym0 = String(buyData.tokenSymbol || '???').trim();
+  const buyerDisp = formatBuyerWalletPreview(buyData.buyerWallet || buyData.buyerWalletShort || '');
+
+  const linkAll = `🔗 PumpFun: ${pump} | Solscan: ${scan} | PumpTx Detail: ${detailUrl}`;
+  const linkDetailOnly = `🔗 PumpTx Detail: ${detailUrl}`;
+  const linkUrlOnly = `🔗 ${detailUrl}`;
+
+  const shortMint = mintFull.length > 24 ? `${mintFull.slice(0, 10)}…${mintFull.slice(-8)}` : mintFull;
+  const shortMint2 = mintFull.length > 18 ? `${mintFull.slice(0, 6)}…${mintFull.slice(-4)}` : mintFull;
+
+  /** @type {{ nameMax: number, buyerMax: number, mint: string, link: 'all'|'detail', footer: boolean }[]} */
+  const tiers = [
+    { nameMax: 200, buyerMax: 200, mint: mintFull, link: 'all', footer: true },
+    { nameMax: 72, buyerMax: 64, mint: mintFull, link: 'all', footer: true },
+    { nameMax: 56, buyerMax: 44, mint: mintFull, link: 'all', footer: true },
+    { nameMax: 48, buyerMax: 36, mint: mintFull, link: 'all', footer: true },
+    { nameMax: 40, buyerMax: 28, mint: mintFull, link: 'detail', footer: true },
+    { nameMax: 36, buyerMax: 24, mint: shortMint, link: 'detail', footer: true },
+    { nameMax: 32, buyerMax: 20, mint: shortMint2, link: 'detail', footer: false },
+  ];
+
+  for (const t of tiers) {
+    const name = trunc(name0, t.nameMax);
+    const sym = trunc(sym0, 20);
+    const buyer = trunc(buyerDisp, t.buyerMax);
+    const linkRow = t.link === 'all' ? linkAll : linkDetailOnly;
+    const text = buildPumptxBuyPlainBlock(
+      { name, sym, mint: t.mint, buyer, linkRow, withFooter: t.footer },
+      buyData,
+    );
+    if (text.length <= CHAR_MAX) return text;
+  }
+
+  /** @type {{ nameMax: number, buyerMax: number, mint: string, link: 'all'|'detail', footer: boolean }[]} */
+  const compactTiers = [
+    { nameMax: 56, buyerMax: 44, mint: mintFull, link: 'detail', footer: true },
+    { nameMax: 44, buyerMax: 32, mint: shortMint, link: 'detail', footer: true },
+    { nameMax: 36, buyerMax: 24, mint: shortMint2, link: 'detail', footer: true },
+    { nameMax: 28, buyerMax: 18, mint: shortMint2, link: 'detail', footer: false },
+  ];
+
+  for (const t of compactTiers) {
+    const name = trunc(name0, t.nameMax);
+    const sym = trunc(sym0, 16);
+    const buyer = trunc(buyerDisp, t.buyerMax);
+    const linkRow = t.link === 'all' ? linkAll : linkDetailOnly;
+    const text = buildPumptxBuyCompactPlainBlock(
+      { name, sym, mint: t.mint, buyer, linkRow, withFooter: t.footer },
+      buyData,
+    );
+    if (text.length <= CHAR_MAX) return text;
+  }
+
+  const microTiers = [
+    { nameMax: 24, buyerMax: 16, mint: shortMint2, link: linkUrlOnly, buyer: true, tsMax: 24, stats: 'full' },
+    { nameMax: 22, buyerMax: 14, mint: shortMint2, link: linkUrlOnly, buyer: true, tsMax: 22, stats: 'mini' },
+    { nameMax: 20, buyerMax: 12, mint: `${mintFull.slice(0, 4)}…${mintFull.slice(-4)}`, link: linkUrlOnly, buyer: true, tsMax: 20, stats: 'mini' },
+    { nameMax: 20, buyerMax: 12, mint: `${mintFull.slice(0, 4)}…${mintFull.slice(-4)}`, link: linkUrlOnly, buyer: true, tsMax: 17, stats: 'mini' },
+    { nameMax: 18, buyerMax: 12, mint: `${mintFull.slice(0, 4)}…${mintFull.slice(-4)}`, link: linkUrlOnly, buyer: false, tsMax: 18, stats: 'mini' },
+  ];
+
+  for (const m of microTiers) {
+    const name = trunc(name0, m.nameMax);
+    const sym = trunc(sym0, 12);
+    const buyer = trunc(buyerDisp, m.buyerMax);
+    const text = buildPumptxBuyMicroPlainBlock(
+      { name, sym, mint: m.mint, buyer, linkRow: m.link },
+      buyData,
+      { includeBuyer: m.buyer, tsMax: m.tsMax, statsStyle: m.stats === 'mini' ? 'mini' : 'full' },
+    );
+    if (text.length <= CHAR_MAX) return text;
+  }
+
+  const sym = trunc(sym0, 10);
+  const name = trunc(name0, 18);
+  return buildPumptxBuyMicroPlainBlock(
+    {
+      name,
+      sym,
+      mint: `${mintFull.slice(0, 3)}…${mintFull.slice(-3)}`,
+      buyer: '',
+      linkRow: linkUrlOnly,
+    },
+    buyData,
+    { includeBuyer: false, tsMax: 14, statsStyle: 'mini' },
+  );
+}
+
+/**
+ * Plain-text BUY alert matching Telegram (`telegram.js`) content order, for Twitter / APIs.
+ * @param {object} buyData
+ * @returns {string}
+ */
+function buildTelegramStylePlainText(buyData) {
+  const base = (process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '');
+  const detailUrl = `${base}/tx/${buyData.signature}`;
+  const mint = buyData.tokenMint || '';
+  const lines = [
+    '🚀 PUMPTX — BUY DETECTED',
+    '',
+    `🏛️ ${buyData.tokenName} ( ${buyData.tokenSymbol} )`,
+    `💰 SOL: ${String(buyData.solSpent)} SOL`,
+    `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)}`,
+    `📈 24h vol: ${formatMarketCapUsd(buyData.volumeUsd24h ?? 0)}`,
+    `💎 FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`,
+    `📋 CA: ${mint}`,
+    `👛 Buyer: ${formatBuyerWalletPreview(buyData.buyerWallet || buyData.buyerWalletShort || '')}`,
+    `🕒 ${buyData.timestamp}`,
+    '',
+    `🔗 PumpFun: ${buyData.pumpFunUrl} | Solscan: ${buyData.solscanUrl} | PumpTx Detail: ${detailUrl}`,
+    '',
+    `powered by PumpTx · by ponks ${AUTHOR_GITHUB_URL}`,
+  ];
+  return lines.join('\n');
+}
+
+/** Approximate X weighted length (for diagnostics). */
+function twitterWeightedLength(text) {
+  let n = 0;
+  for (const ch of text) {
+    const cp = ch.codePointAt(0);
+    if (cp > 0xffff) n += 2;
+    else if (cp >= 0x2600 && cp <= 0x27bf) n += 2;
+    else if (cp >= 0xfe00 && cp <= 0xfe0f) n += 0;
+    else if (cp >= 0x1f300 && cp <= 0x1faf6) n += 2;
+    else n += 1;
+  }
+  return n;
+}
+
+module.exports = { buildTelegramStylePlainText, buildTwitterSafePlainText, twitterWeightedLength };

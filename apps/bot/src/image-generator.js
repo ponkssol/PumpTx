@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 const { formatMarketCapUsd } = require('./format-mc');
+const { formatBuyerWalletPreview } = require('./parser');
 
 const OUT = path.join(__dirname, '..', 'public', 'generated');
 const LOGO_PATH = path.join(__dirname, '..', 'templates', 'pumptx-logo.png');
@@ -129,7 +130,7 @@ async function generateImage(buyData, opts = {}) {
   const solNum = esc(formatSol(Number(buyData.solSpent)));
   const mcStr = formatMarketCapUsd(buyData.marketCapUsd, { zeroLabel: 'N/A' });
   const tokAmt = esc(clipRaw(String(buyData.tokenAmount ?? '—'), 32));
-  const buyerWalletStr = String(buyData.buyerWallet || buyData.buyerWalletShort || '');
+  const buyerWalletStr = formatBuyerWalletPreview(buyData.buyerWallet || buyData.buyerWalletShort || '');
   const buyer = esc(buyerWalletStr);
   /** Full wallet in mono; slightly smaller if unusually long. */
   const buyerFontPx = buyerWalletStr.length > 48 ? 16 : buyerWalletStr.length > 44 ? 17 : 19;

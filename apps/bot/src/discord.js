@@ -61,13 +61,13 @@ function buildEmbedDescription(buyData, detailUrl) {
   const mc = inlineCode(formatMarketCapUsd(buyData.marketCapUsd));
   const vol = inlineCode(formatMarketCapUsd(buyData.volumeUsd24h ?? 0));
   const fdv = inlineCode(formatMarketCapUsd(buyData.fdvUsd ?? 0));
-  const buyer = inlineCode(buyData.buyerWallet || buyData.buyerWalletShort || '');
+  const buyer = inlineCode(buyData.buyerWalletShort || buyData.buyerWallet || '');
   const mintRaw = buyData.tokenMint || '';
   const ts = escMd(buyData.timestamp || '');
 
   /** @type {string[]} */
   const lines = [
-    `🪙 **${name}** (\`${sym}\`)`,
+    `🏛️ **${name}** (\`${sym}\`)`,
     `💰 **SOL:** \`${sol}\``,
     `📊 **MC:** \`${mc}\``,
     `📈 **24h vol:** \`${vol}\``,
@@ -80,7 +80,7 @@ function buildEmbedDescription(buyData, detailUrl) {
     lines.push('📋 **CA:**', '```', safeMintForFence(mintRaw), '```');
   }
 
-  lines.push(`👛 **Buyer:** \`${buyer}\``, `🕐 ${ts}`, '');
+  lines.push(`👛 **Buyer:** \`${buyer}\``, `🕒 ${ts}`, '');
   lines.push(
     `🔗 [PumpFun](${buyData.pumpFunUrl}) | [Solscan](${buyData.solscanUrl}) | [PumpTx Detail](${detailUrl})`,
     '',

@@ -26,7 +26,7 @@ PumpTx v1.0.0 — PumpFun Buy Monitor + Dashboard
 function requiredEnv() {
   return [
     'SOLANA_RPC_HTTPS', 'SOLANA_RPC_WSS', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID',
-    'TWITTER_API_IO_KEY', 'NEXT_PUBLIC_BASE_URL', 'BOT_PORT', 'MIN_BUY_SOL', 'COOLDOWN_MS', 'BOT_BASE_URL',
+    'TWITTER_API_IO_KEY', 'TWITTER_BASE_URL', 'NEXT_PUBLIC_BASE_URL', 'BOT_PORT', 'MIN_BUY_SOL', 'COOLDOWN_MS', 'BOT_BASE_URL',
   ];
 }
 
@@ -84,8 +84,8 @@ async function onBuy(raw) {
     })(),
     (async () => {
       try {
-        await tweet(row, imgBuffer || imgPath);
-        updateTweetStatus(row.signature, 1);
+        const { posted } = await tweet(row, imgBuffer || imgPath);
+        if (posted) updateTweetStatus(row.signature, 1);
       } catch (e) {
         log.error(`Twitter failed: ${e.message}`);
         try { updateTweetStatus(row.signature, 0); } catch (_) { /* ignore */ }

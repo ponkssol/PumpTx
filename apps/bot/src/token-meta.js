@@ -32,14 +32,26 @@ function safeIconUrl(u) {
   return t;
 }
 
-/** 24h USD-ish volume from Jupiter stats24h (buy + sell legs). */
-function jupiter24hVolumeUsd(row) {
+/**
+ * Jupiter stats24h buy/sell USD (for Twitter-style split lines).
+ * @param {any} row
+ * @returns {{ buy: number, sell: number, total: number }}
+ */
+function jupiterBuySellVolumeUsd(row) {
   const s = row && row.stats24h;
-  if (!s || typeof s !== 'object') return 0;
+  if (!s || typeof s !== 'object') return { buy: 0, sell: 0, total: 0 };
   const b = Number(s.buyVolume);
   const sv = Number(s.sellVolume);
-  const sum = (Number.isFinite(b) ? b : 0) + (Number.isFinite(sv) ? sv : 0);
-  return sum > 0 ? Math.round(sum) : 0;
+  const buy = Number.isFinite(b) && b > 0 ? Math.round(b) : 0;
+  const sell = Number.isFinite(sv) && sv > 0 ? Math.round(sv) : 0;
+  const total = buy + sell > 0 ? buy + sell : 0;
+  return { buy, sell, total };
+}
+
+/** 24h USD-ish volume from Jupiter stats24h (buy + sell legs). */
+function jupiter24hVolumeUsd(row) {
+  const { total } = jupiterBuySellVolumeUsd(row);
+  return total;
 }
 
 /** @param {number|undefined|null} x */
@@ -70,7 +82,7 @@ async function fetchJson(url, timeoutMs) {
 /**
  * @param {string} mint
  * @param {number} timeoutMs
- * @returns {Promise<{ tokenName: string, tokenSymbol: string, marketCapUsd: number, volumeUsd24h: number, fdvUsd: number, tokenIconUrl: string|null }|null>}
+ * @returns {Promise<{ tokenName: string, tokenSymbol: string, marketCapUsd: number, volumeUsd24h: number, volumeBuyUsd24h: number, volumeSellUsd24h: number, fdvUsd: number, tokenIconUrl: string|null }|null>}
  */
 async function fromJupiter(mint, timeoutMs) {
   const data = await fetchJson(`${JUPITER_SEARCH}?query=${encodeURIComponent(mint)}`, timeoutMs);
@@ -82,11 +94,14 @@ async function fromJupiter(mint, timeoutMs) {
   const symbol = clip(row.symbol, 24);
   if (!name && !symbol) return null;
   const iconRaw = row.icon || row.logoURI || row.image || row.logo;
+  const vol24 = jupiterBuySellVolumeUsd(row);
   return {
     tokenName: name || mint.slice(0, 8),
     tokenSymbol: symbol || '???',
     marketCapUsd: Number.isFinite(mcap) && mcap > 0 ? Math.round(mcap) : 0,
-    volumeUsd24h: jupiter24hVolumeUsd(row),
+    volumeUsd24h: vol24.total,
+    volumeBuyUsd24h: vol24.buy,
+    volumeSellUsd24h: vol24.sell,
     fdvUsd: roundUsd(row.fdv),
     tokenIconUrl: safeIconUrl(iconRaw),
   };
@@ -95,7 +110,7 @@ async function fromJupiter(mint, timeoutMs) {
 /**
  * @param {string} mint
  * @param {number} timeoutMs
- * @returns {Promise<{ tokenName: string, tokenSymbol: string, marketCapUsd: number, volumeUsd24h: number, fdvUsd: number, tokenIconUrl: string|null }|null>}
+ * @returns {Promise<{ tokenName: string, tokenSymbol: string, marketCapUsd: number, volumeUsd24h: number, fdvUsd: number, liquidityUsd: number, tokenIconUrl: string|null }|null>}
  */
 async function fromDexscreener(mint, timeoutMs) {
   const data = await fetchJson(`${DEXSCREENER_TOKENS}/${mint}`, timeoutMs);
@@ -125,12 +140,17 @@ async function fromDexscreener(mint, timeoutMs) {
     volumeUsd24h = roundUsd(pair.volume.h24);
   }
   const fdvUsd = roundUsd(pair.fdv);
+  let liquidityUsd = 0;
+  if (pair.liquidity && typeof pair.liquidity === 'object') {
+    liquidityUsd = roundUsd(pair.liquidity.usd);
+  }
   return {
     tokenName: name || mint.slice(0, 8),
     tokenSymbol: symbol || '???',
     marketCapUsd: Number.isFinite(mcap) && mcap > 0 ? Math.round(mcap) : 0,
     volumeUsd24h,
     fdvUsd,
+    liquidityUsd,
     tokenIconUrl,
   };
 }
@@ -148,7 +168,8 @@ async function enrichPumpMetadata(buy) {
     !meta ||
     !meta.tokenIconUrl ||
     meta.volumeUsd24h === 0 ||
-    meta.fdvUsd === 0;
+    meta.fdvUsd === 0 ||
+    !(Number(meta.liquidityUsd) > 0);
   let dex = null;
   if (needDex) {
     dex = await fromDexscreener(buy.tokenMint, timeoutMs);
@@ -160,6 +181,7 @@ async function enrichPumpMetadata(buy) {
       volumeUsd24h: meta.volumeUsd24h || dex.volumeUsd24h,
       fdvUsd: meta.fdvUsd || dex.fdvUsd,
       marketCapUsd: meta.marketCapUsd > 0 ? meta.marketCapUsd : dex.marketCapUsd,
+      liquidityUsd: dex.liquidityUsd || meta.liquidityUsd || 0,
     };
   } else if (!meta && dex) {
     meta = dex;
@@ -169,6 +191,9 @@ async function enrichPumpMetadata(buy) {
     return buy;
   }
   const tokenIconUrl = meta.tokenIconUrl || buy.tokenIconUrl || null;
+  const volumeBuyUsd24h = Number(meta.volumeBuyUsd24h) > 0 ? meta.volumeBuyUsd24h : buy.volumeBuyUsd24h || 0;
+  const volumeSellUsd24h = Number(meta.volumeSellUsd24h) > 0 ? meta.volumeSellUsd24h : buy.volumeSellUsd24h || 0;
+  const liquidityUsd = Number(meta.liquidityUsd) > 0 ? meta.liquidityUsd : buy.liquidityUsd || 0;
   return {
     ...buy,
     tokenName: meta.tokenName || buy.tokenName,
@@ -176,6 +201,9 @@ async function enrichPumpMetadata(buy) {
     marketCapUsd: meta.marketCapUsd > 0 ? meta.marketCapUsd : buy.marketCapUsd,
     volumeUsd24h: meta.volumeUsd24h > 0 ? meta.volumeUsd24h : buy.volumeUsd24h || 0,
     fdvUsd: meta.fdvUsd > 0 ? meta.fdvUsd : buy.fdvUsd || 0,
+    volumeBuyUsd24h,
+    volumeSellUsd24h,
+    liquidityUsd,
     tokenIconUrl,
   };
 }

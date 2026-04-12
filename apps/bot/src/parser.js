@@ -37,6 +37,18 @@ function shortSig(s, a, b) {
 }
 
 /**
+ * Buyer wallet for alerts: first 4 + "...." + last 4 (e.g. xasj....Xaxm).
+ * @param {string|undefined|null} wallet
+ * @returns {string}
+ */
+function formatBuyerWalletPreview(wallet) {
+  const s = String(wallet || '').trim();
+  if (!s) return '';
+  if (s.length <= 8) return s;
+  return `${s.slice(0, 4)}....${s.slice(-4)}`;
+}
+
+/**
  * @param {import('@solana/web3.js').VersionedTransactionResponse | null} tx
  * @returns {object|null}
  */
@@ -106,7 +118,7 @@ function parseBuyTx(tx) {
     tokenSymbol,
     tokenName,
     buyerWallet: buyer,
-    buyerWalletShort: shortSig(buyer, 6, 4),
+    buyerWalletShort: formatBuyerWalletPreview(buyer),
     solSpent,
     tokenAmount,
     marketCapUsd: 0,
@@ -118,4 +130,4 @@ function parseBuyTx(tx) {
   };
 }
 
-module.exports = { parseBuyTx };
+module.exports = { parseBuyTx, formatBuyerWalletPreview };
