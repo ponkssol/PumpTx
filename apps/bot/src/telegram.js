@@ -6,6 +6,8 @@ const token = process.env.TELEGRAM_BOT_TOKEN;
 const chatId = process.env.TELEGRAM_CHAT_ID;
 const bot = token ? new TelegramBot(token, { polling: false }) : null;
 
+const AUTHOR_GITHUB_URL = 'https://github.com/ponkssol';
+
 /** @param {string} s */
 function escHtml(s) {
   return String(s)
@@ -37,7 +39,7 @@ async function notify(buyData, imagePathOrBuffer) {
     '',
     `🔗 <a href="${buyData.pumpFunUrl}">PumpFun</a> | <a href="${buyData.solscanUrl}">Solscan</a> | <a href="${detailUrl}">PumpTx Detail</a>`,
     '',
-    '<i>powered by PumpTx</i>',
+    `<i>powered by PumpTx · by <a href="${AUTHOR_GITHUB_URL}">ponks</a></i>`,
   ].join('\n');
   if (Buffer.isBuffer(imagePathOrBuffer) && imagePathOrBuffer.length) {
     await bot.sendPhoto(chatId, imagePathOrBuffer, { caption: cap, parse_mode: 'HTML' });

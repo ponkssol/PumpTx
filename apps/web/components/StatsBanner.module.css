@@ -28,3 +28,9 @@
   text-transform: uppercase;
   margin-right: 4px;
 }
+
+.usdNote {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}

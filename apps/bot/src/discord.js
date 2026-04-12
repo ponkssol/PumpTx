@@ -3,6 +3,8 @@ const axios = require('axios');
 const FormData = require('form-data');
 const { formatMarketCapUsd } = require('./format-mc');
 
+const AUTHOR_GITHUB_URL = 'https://github.com/ponkssol';
+
 /** Resolves webhook URL from env (read at send time so .env is always current after restart). */
 function getDiscordWebhookUrl() {
   let u = (process.env.DISCORD_WEBHOOK_URL || process.env.DISCORD_WEBHOOK || '').trim();
@@ -82,7 +84,7 @@ function buildEmbedDescription(buyData, detailUrl) {
   lines.push(
     `🔗 [PumpFun](${buyData.pumpFunUrl}) | [Solscan](${buyData.solscanUrl}) | [PumpTx Detail](${detailUrl})`,
     '',
-    '*powered by PumpTx*',
+    `*powered by PumpTx* · by [ponks](${AUTHOR_GITHUB_URL})`,
   );
 
   let out = lines.join('\n');

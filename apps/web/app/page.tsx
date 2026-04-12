@@ -8,12 +8,22 @@ import TransactionFeed from '@/components/TransactionFeed';
 import DashboardDetailPanel from '@/components/DashboardDetailPanel';
 import styles from './page.module.css';
 
-type Stats = { total_transactions: number; total_sol_volume: number };
+type Stats = {
+  total_transactions: number;
+  total_sol_volume: number;
+  sol_usd_price: number | null;
+  volume_usd: number | null;
+};
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [txs, setTxs] = useState<Transaction[]>([]);
-  const [stats, setStats] = useState<Stats>({ total_transactions: 0, total_sol_volume: 0 });
+  const [stats, setStats] = useState<Stats>({
+    total_transactions: 0,
+    total_sol_volume: 0,
+    sol_usd_price: null,
+    volume_usd: null,
+  });
   const [newestId, setNewestId] = useState<number | undefined>(undefined);
   const [selectedSig, setSelectedSig] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -69,7 +79,14 @@ export default function HomePage() {
         if (prevTop.current && top && top !== prevTop.current) setNewestId(top);
         prevTop.current = top;
         setTxs(next);
-        setStats(data.stats || { total_transactions: 0, total_sol_volume: 0 });
+        setStats(
+          data.stats || {
+            total_transactions: 0,
+            total_sol_volume: 0,
+            sol_usd_price: null,
+            volume_usd: null,
+          },
+        );
       } catch {
         // Keep UI stable; next poll may recover
       } finally {
@@ -102,7 +119,11 @@ export default function HomePage() {
     <div className={styles.page}>
       <TerminalHeader />
       <main className={styles.main}>
-        <StatsBanner totalBuys={stats.total_transactions} totalSol={stats.total_sol_volume} />
+        <StatsBanner
+          totalBuys={stats.total_transactions}
+          totalSol={stats.total_sol_volume}
+          volumeUsd={stats.volume_usd}
+        />
         <div className={styles.window}>
           {loading ? <div className={styles.skel} aria-label="loading" /> : null}
           {!loading ? (
