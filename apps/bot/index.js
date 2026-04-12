@@ -7,6 +7,7 @@ const { parseBuyTx } = require('./src/parser');
 const { shouldNotify } = require('./src/filter');
 const { generateImage } = require('./src/image-generator');
 const { notify } = require('./src/telegram');
+const { notifyDiscord, isDiscordWebhookEnabled } = require('./src/discord');
 const { tweet } = require('./src/twitter');
 const { startListener } = require('./src/listener');
 const { enrichPumpMetadata } = require('./src/token-meta');
@@ -90,6 +91,13 @@ async function onBuy(raw) {
         try { updateTweetStatus(row.signature, 0); } catch (_) { /* ignore */ }
       }
     })(),
+    (async () => {
+      try {
+        await notifyDiscord(row, imgBuffer || imgPath, imgUrl);
+      } catch (e) {
+        log.error(`Discord failed: ${e.message}`);
+      }
+    })(),
   ]);
 }
 
@@ -97,6 +105,9 @@ async function onBuy(raw) {
 async function main() {
   console.log(banner);
   validateEnv();
+  if (isDiscordWebhookEnabled()) {
+    log.info('Discord webhook: enabled (BUY alerts will post to Discord)');
+  }
   initDb();
   if (String(process.env.PUMPTX_SHARE_IMAGE_MODE || 'disk').toLowerCase() === 'memory') {
     log.info('Share card: PUMPTX_SHARE_IMAGE_MODE=memory (PNG not written to disk; DB image_url empty)');

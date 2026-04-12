@@ -1,10 +1,10 @@
 # PumpTx 🚀
 
-> Real-time PumpFun BUY monitor with terminal dashboard + auto post to X & Telegram
+> Real-time PumpFun BUY monitor with terminal dashboard + auto post to X, Telegram, and (optionally) Discord
 
 PumpTx is a small monorepo with two apps:
 
-- **`apps/bot`**: listens to PumpFun program logs on Solana, parses BUY activity, generates a Sharp “terminal card” image, stores rows in SQLite, and notifies Telegram/X.
+- **`apps/bot`**: listens to PumpFun program logs on Solana, parses BUY activity, generates a Sharp “terminal card” image, stores rows in SQLite, and notifies Telegram/X (and Discord via webhook when configured).
 - **`apps/web`**: Next.js 14 App Router dashboard that polls SQLite-backed APIs for a live feed and transaction detail pages.
 
 ## Architecture Overview
@@ -83,7 +83,7 @@ Open `NEXT_PUBLIC_BASE_URL` (default `http://localhost:3000`).
 
 Create a project in Helius and copy:
 
-- HTTPS RPC URL → `SOLANA_RPC_HTTPS`
+- HTTPS RPC URL(s) → `SOLANA_RPC_HTTPS` (optional **comma-separated** Helius URLs with different `api-key` values to round-robin `getTransaction` and raise throughput; **first** URL’s key should match `SOLANA_RPC_WSS` because only one websocket subscription is used)
 - WSS URL → `SOLANA_RPC_WSS`
 
 ### Telegram Bot
@@ -118,10 +118,11 @@ If your account uses different routes (for example `upload_media_v2` / `create_t
 
 | Name | Purpose |
 | --- | --- |
-| `SOLANA_RPC_HTTPS` | Solana HTTP RPC |
-| `SOLANA_RPC_WSS` | Solana websocket RPC |
+| `SOLANA_RPC_HTTPS` | Solana HTTP RPC. Comma-separated URLs = pool (round-robin `getTransaction` across keys). |
+| `SOLANA_RPC_WSS` | Solana websocket RPC. One URL = subscribe on first HTTPS endpoint only. **Comma-separated** URLs (same count as `SOLANA_RPC_HTTPS`) = one `onLogs` per key; duplicate signatures are dropped (`WSS_LOG_DEDUPE_MS`, default 45s). |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token |
 | `TELEGRAM_CHAT_ID` | Destination chat/channel id |
+| `DISCORD_WEBHOOK_URL` | Optional. [Incoming Webhook](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) URL; BUY alerts post as a rich embed (image attached or linked). Alias: `DISCORD_WEBHOOK`. |
 | `TWITTER_API_IO_KEY` | twitterapi.io API key |
 | `TWITTERAPI_IO_BASE_URL` | Optional API host override |
 | `NEXT_PUBLIC_BASE_URL` | Public website base URL (detail links) |
@@ -129,9 +130,10 @@ If your account uses different routes (for example `upload_media_v2` / `create_t
 | `BOT_BASE_URL` | Public base URL for generated images (`/generated/...`) |
 | `MIN_BUY_SOL` | Minimum SOL threshold for notifications |
 | `COOLDOWN_MS` | Per-mint cooldown between notifications |
-| `RPC_MIN_INTERVAL_MS` | Delay between queued `getTransaction` calls (default `143` → **≤7 req/s**; Helius Free = 10 RPS total) |
+| `RPC_MIN_INTERVAL_MS` | Delay between queued `getTransaction` calls. Default `ceil(1000/(7×N))` ms when `N` = number of comma-separated HTTPS URLs (`143` for one URL → ~7 req/s per key headroom). |
 | `RPC_QUEUE_CAP` | Max queued unique signatures before dropping (default `80`) |
 | `RPC_429_BACKOFF_MS` | Extra pause after a 429 response (default `2500`) |
+| `WSS_LOG_DEDUPE_MS` | When using multi-`SOLANA_RPC_WSS`, ignore duplicate log signatures within this window (default `45000`) |
 
 ## Troubleshooting
 

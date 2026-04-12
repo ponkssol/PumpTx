@@ -32,7 +32,7 @@ async function notify(buyData, imagePathOrBuffer) {
     `📈 <b>24h vol:</b> <code>${escHtml(formatMarketCapUsd(buyData.volumeUsd24h ?? 0))}</code>`,
     `💎 <b>FDV:</b> <code>${escHtml(formatMarketCapUsd(buyData.fdvUsd ?? 0))}</code>`,
     `📋 <b>CA:</b> <code>${escHtml(mint)}</code>`,
-    `👛 <b>Buyer:</b> <code>${escHtml(buyData.buyerWalletShort || '')}</code>`,
+    `👛 <b>Buyer:</b> <code>${escHtml(buyData.buyerWallet || buyData.buyerWalletShort || '')}</code>`,
     `🕐 ${buyData.timestamp}`,
     '',
     `🔗 <a href="${buyData.pumpFunUrl}">PumpFun</a> | <a href="${buyData.solscanUrl}">Solscan</a> | <a href="${detailUrl}">PumpTx Detail</a>`,

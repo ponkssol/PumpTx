@@ -8,6 +8,17 @@ function formatNow(d: Date) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+function IconTelegram({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width={18} height={18} aria-hidden focusable={false}>
+      <path
+        fill="currentColor"
+        d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.781-.417-1.213.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"
+      />
+    </svg>
+  );
+}
+
 function IconX({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" width={18} height={18} aria-hidden focusable={false}>
@@ -34,6 +45,7 @@ export default function TerminalHeader() {
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
+  const telegramHref = process.env.NEXT_PUBLIC_SOCIAL_TELEGRAM_URL?.trim() || 'https://telegram.org';
   const xHref = process.env.NEXT_PUBLIC_SOCIAL_X_URL?.trim() || 'https://x.com';
   const discordHref = process.env.NEXT_PUBLIC_SOCIAL_DISCORD_URL?.trim() || 'https://discord.com';
 
@@ -52,6 +64,15 @@ export default function TerminalHeader() {
         </div>
         <div className={styles.trail}>
           <div className={styles.social}>
+            <a
+              className={styles.socialBtn}
+              href={telegramHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Telegram"
+            >
+              <IconTelegram className={styles.socialIcon} />
+            </a>
             <a
               className={styles.socialBtn}
               href={xHref}

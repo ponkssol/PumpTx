@@ -4,32 +4,85 @@ const log = require('./logger');
 const PUMP = new PublicKey('6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P');
 const MAX_RETRIES = 10;
 const RECONNECT_MS = 5000;
-/** Cap queued `getTransaction` at ≤7/s (Helius Free = 10 RPS total across all RPC). Gap = ceil(1000/7) ms. */
-const RPC_GAP_MS = Number(process.env.RPC_MIN_INTERVAL_MS || String(Math.ceil(1000 / 7)));
 const RPC_QUEUE_CAP = Number(process.env.RPC_QUEUE_CAP || '80');
 const RATE_LIMIT_BACKOFF_MS = Number(process.env.RPC_429_BACKOFF_MS || '2500');
+/** Drop duplicate log signatures across parallel websockets (ms). */
+const WSS_LOG_DEDUPE_MS = Number(process.env.WSS_LOG_DEDUPE_MS || '45000');
+
+/** @returns {string[]} */
+function parseSolanaHttpsPool() {
+  const raw = (process.env.SOLANA_RPC_HTTPS || '').trim();
+  if (!raw) return [];
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/** @returns {string[]} */
+function parseSolanaWssPool() {
+  const raw = (process.env.SOLANA_RPC_WSS || '').trim();
+  if (!raw) return [];
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
 
 /**
  * @param {(raw: import('@solana/web3.js').VersionedTransactionResponse) => Promise<void>} onBuy
  * @returns {Promise<() => Promise<void>>}
  */
 async function startListener(onBuy) {
+  const httpsPool = parseSolanaHttpsPool();
+  if (!httpsPool.length) {
+    log.error('SOLANA_RPC_HTTPS must contain at least one URL');
+    return async () => {};
+  }
+
+  const wssPool = parseSolanaWssPool();
+  if (!wssPool.length) {
+    log.error('SOLANA_RPC_WSS must contain at least one URL');
+    return async () => {};
+  }
+
+  const poolN = httpsPool.length;
+  /** Helius Free ≈10 RPS per API key; spread getTransaction across keys (~7/s each headroom). */
+  const RPC_GAP_MS = Number(
+    process.env.RPC_MIN_INTERVAL_MS || String(Math.ceil(1000 / (7 * poolN))),
+  );
+
   let retries = 0;
+  let loggedPoolHint = false;
+  /** @type {Connection[]} */
+  let httpPool = [];
   /** @type {Connection|null} */
   let conn = null;
-  const connRef = { current: /** @type {Connection|null} */ (null) };
-  /** @type {number|null} */
-  let subId = null;
+  /** Active onLogs subscriptions (multi-WSS = one per connection). */
+  /** @type {{ conn: Connection, id: number }[]} */
+  let subscriptions = [];
   /** @type {ReturnType<typeof setInterval>|null} */
   let health = null;
   let stopped = false;
   /** @type {Set<string>} */
   const pendingSigs = new Set();
+  /** Dedupe identical Pump log events from multiple websocket keys. */
+  /** @type {Map<string, number>} */
+  const recentLogSig = new Map();
   /** @type {Promise<void>} */
   let rpcChain = Promise.resolve();
+  let rr = 0;
+
+  function isDuplicateLogSignature(signature) {
+    const now = Date.now();
+    const prev = recentLogSig.get(signature);
+    if (prev != null && now - prev < WSS_LOG_DEDUPE_MS) return true;
+    recentLogSig.set(signature, now);
+    if (recentLogSig.size > 8000) {
+      const cutoff = now - WSS_LOG_DEDUPE_MS;
+      for (const [k, t] of recentLogSig) {
+        if (t < cutoff) recentLogSig.delete(k);
+      }
+    }
+    return false;
+  }
 
   /**
-   * Serializes getTransaction calls to respect Helius Free (~10 RPS total RPC budget).
+   * Serializes getTransaction with RPC_GAP_MS spacing; rotates across HTTP pool.
    * @param {string} signature
    */
   function queueTxFetch(signature) {
@@ -42,8 +95,9 @@ async function startListener(onBuy) {
     rpcChain = rpcChain.then(async () => {
       try {
         await new Promise((r) => setTimeout(r, RPC_GAP_MS));
-        const c = connRef.current;
-        if (!c || stopped) return;
+        if (stopped || !httpPool.length) return;
+        const c = httpPool[rr % httpPool.length];
+        rr += 1;
         const raw = await c.getTransaction(signature, {
           maxSupportedTransactionVersion: 0,
           commitment: 'confirmed',
@@ -65,33 +119,73 @@ async function startListener(onBuy) {
     });
   }
 
-  const stopSub = () => {
+  function onPumpLog(l) {
     try {
-      if (conn && subId != null) conn.removeOnLogsListener(subId);
-    } catch (_) { /* ignore */ }
-    subId = null;
+      if (!l.logs.some((x) => x.includes('Buy'))) return;
+      const sig = l.signature;
+      if (isDuplicateLogSignature(sig)) return;
+      queueTxFetch(sig);
+    } catch (e) {
+      log.listenerErr.push(e.message || String(e));
+    }
+  }
+
+  const stopSub = () => {
+    for (const sub of subscriptions) {
+      try {
+        sub.conn.removeOnLogsListener(sub.id);
+      } catch (_) { /* ignore */ }
+    }
+    subscriptions = [];
   };
 
   const wire = () => {
     stopSub();
-    conn = new Connection(process.env.SOLANA_RPC_HTTPS, {
-      commitment: 'confirmed',
-      wsEndpoint: process.env.SOLANA_RPC_WSS,
-    });
-    connRef.current = conn;
-    subId = conn.onLogs(
-      PUMP,
-      (l) => {
-        try {
-          if (!l.logs.some((x) => x.includes('Buy'))) return;
-          queueTxFetch(l.signature);
-        } catch (e) {
-          log.listenerErr.push(e.message || String(e));
-        }
-      },
-      'confirmed',
-    );
-    log.success(`Subscribed to PumpFun logs (id ${subId})`);
+    const useMultiWs = wssPool.length > 1 && wssPool.length === httpsPool.length;
+
+    if (wssPool.length > 1 && wssPool.length !== httpsPool.length) {
+      log.warn(
+        `SOLANA_RPC_WSS has ${wssPool.length} URL(s) but SOLANA_RPC_HTTPS has ${httpsPool.length} — counts must match for multi-WS; falling back to first WSS only`,
+      );
+    }
+
+    if (useMultiWs) {
+      httpPool = httpsPool.map((endpoint, i) => new Connection(endpoint, {
+        commitment: 'confirmed',
+        wsEndpoint: wssPool[i],
+      }));
+    } else {
+      const primaryWss = wssPool[0];
+      httpPool = httpsPool.map((endpoint, i) => new Connection(endpoint, {
+        commitment: 'confirmed',
+        ...(i === 0 && primaryWss ? { wsEndpoint: primaryWss } : {}),
+      }));
+    }
+
+    conn = httpPool[0] || null;
+    if (!conn) return;
+
+    if (!loggedPoolHint) {
+      loggedPoolHint = true;
+      const wsPart = useMultiWs
+        ? `${wssPool.length} websocket log subscriptions (cross-WS dedupe ${WSS_LOG_DEDUPE_MS}ms)`
+        : '1 websocket log subscription';
+      log.info(
+        `RPC HTTP pool: ${poolN} endpoint(s), ${wsPart}, getTransaction gap ${RPC_GAP_MS}ms (~${(1000 / RPC_GAP_MS).toFixed(1)} req/s chain)`,
+      );
+    }
+
+    if (useMultiWs) {
+      for (const c of httpPool) {
+        const id = c.onLogs(PUMP, onPumpLog, 'confirmed');
+        subscriptions.push({ conn: c, id });
+      }
+      log.success(`Subscribed to PumpFun logs on ${subscriptions.length} websocket(s)`);
+    } else {
+      const id = conn.onLogs(PUMP, onPumpLog, 'confirmed');
+      subscriptions.push({ conn, id });
+      log.success(`Subscribed to PumpFun logs (id ${id})`);
+    }
     retries = 0;
   };
 
@@ -123,10 +217,11 @@ async function startListener(onBuy) {
 
   return async () => {
     stopped = true;
-    connRef.current = null;
+    httpPool = [];
     if (health) clearInterval(health);
     stopSub();
     conn = null;
+    recentLogSig.clear();
     try { await rpcChain; } catch (_) { /* ignore */ }
     log.rpcQueueSat.flush();
     log.lutUnresolved.flush();
