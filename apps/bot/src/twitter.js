@@ -39,6 +39,29 @@ function isApiSuccess(data) {
   return Boolean(data.tweet_id);
 }
 
+/** @param {unknown} data */
+function isCreateTweetAmbiguousSuccess(data) {
+  if (!data || typeof data !== 'object') return false;
+  if (String(data.status || '').toLowerCase() !== 'error') return false;
+  const msg = String(data.message || '').toLowerCase();
+  return msg.includes('could not extract tweet_id');
+}
+
+/** @param {unknown} data */
+function shouldReloginForCreateTweet(data) {
+  if (!data || typeof data !== 'object') return true;
+  const msg = `${String(data.status || '')} ${String(data.message || '')}`.toLowerCase();
+  return (
+    msg.includes('login') ||
+    msg.includes('auth') ||
+    msg.includes('authentication') ||
+    msg.includes('cookie') ||
+    msg.includes('cookies') ||
+    msg.includes('unauthorized') ||
+    msg.includes('forbidden')
+  );
+}
+
 /**
  * @param {string} tweetText
  * @param {string} loginCookies
@@ -120,29 +143,34 @@ async function tweet(buyData, _imagePathOrBuffer) {
   } catch (e) {
     const msg = e && e.message ? e.message : String(e);
     log.warn(`Twitter create_tweet_v2 request error: ${msg}`);
+    // Network-level errors are retried after relogin (best effort).
     await userLoginV2();
     const fresh = getTwitterLoginCookies();
     if (!fresh) throw new Error('Twitter login cookies missing after login');
     const second = await runCreate(fresh);
-    if (!(second.httpStatus >= 200 && second.httpStatus < 300 && isApiSuccess(second.data))) {
-      throw new Error(`Twitter create_tweet_v2 failed after login: http=${second.httpStatus} body=${safeJson(second.data)}`);
+    if (second.httpStatus >= 200 && second.httpStatus < 300 && (isApiSuccess(second.data) || isCreateTweetAmbiguousSuccess(second.data))) {
+      return { posted: true };
     }
-    return { posted: true };
+    throw new Error(`Twitter create_tweet_v2 failed after login: http=${second.httpStatus} body=${safeJson(second.data)}`);
   }
 
-  if (first.httpStatus >= 200 && first.httpStatus < 300 && isApiSuccess(first.data)) {
+  if (first.httpStatus >= 200 && first.httpStatus < 300 && (isApiSuccess(first.data) || isCreateTweetAmbiguousSuccess(first.data))) {
     return { posted: true };
   }
 
   log.warn(`Twitter create_tweet_v2 failed: http=${first.httpStatus} body=${safeJson(first.data)}`);
+  if (!shouldReloginForCreateTweet(first.data)) {
+    throw new Error(`Twitter create_tweet_v2 failed (no relogin): http=${first.httpStatus} body=${safeJson(first.data)}`);
+  }
+
   await userLoginV2();
   const fresh = getTwitterLoginCookies();
   if (!fresh) throw new Error('Twitter login cookies missing after login');
   const retry = await runCreate(fresh);
-  if (!(retry.httpStatus >= 200 && retry.httpStatus < 300 && isApiSuccess(retry.data))) {
-    throw new Error(`Twitter create_tweet_v2 failed after re-login: http=${retry.httpStatus} body=${safeJson(retry.data)}`);
+  if (retry.httpStatus >= 200 && retry.httpStatus < 300 && (isApiSuccess(retry.data) || isCreateTweetAmbiguousSuccess(retry.data))) {
+    return { posted: true };
   }
-  return { posted: true };
+  throw new Error(`Twitter create_tweet_v2 failed after re-login: http=${retry.httpStatus} body=${safeJson(retry.data)}`);
 }
 
 module.exports = { tweet };
