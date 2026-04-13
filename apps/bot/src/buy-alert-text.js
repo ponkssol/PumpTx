@@ -1,4 +1,5 @@
 const { formatMarketCapUsd } = require('./format-mc');
+const { formatSolAmount } = require('./format-sol');
 
 const AUTHOR_GITHUB_URL = 'https://github.com/ponkssol';
 
@@ -28,7 +29,7 @@ function buildPumptxBuyPlainBlock(o, buyData) {
     '🚀 PUMPTX — BUY DETECTED',
     '',
     `🏛️ ${o.name} ( ${o.sym} )`,
-    `💰 SOL: ${String(buyData.solSpent)} SOL`,
+    `💰 SOL: ${formatSolAmount(buyData.solSpent)} SOL`,
     `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)}`,
     `📈 24h vol: ${formatMarketCapUsd(buyData.volumeUsd24h ?? 0)}`,
     `💎 FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`,
@@ -51,14 +52,12 @@ function buildPumptxBuyPlainBlock(o, buyData) {
  * @param {object} buyData
  */
 function buildPumptxBuyCompactPlainBlock(o, buyData) {
-  const statsLine = `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)} | 24h vol: ${formatMarketCapUsd(
-    buyData.volumeUsd24h ?? 0,
-  )} | FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`;
+  const statsLine = `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)}`;
   const parts = [
     '🚀 PUMPTX — BUY DETECTED',
     '',
     `🏛️ ${o.name} ( ${o.sym} )`,
-    `💰 SOL: ${String(buyData.solSpent)} SOL`,
+    `💰 SOL: ${formatSolAmount(buyData.solSpent)} SOL`,
     statsLine,
     `📋 CA: ${o.mint}`,
     `👛 Buyer: ${o.buyer}`,
@@ -82,18 +81,14 @@ function buildPumptxBuyCompactPlainBlock(o, buyData) {
 function buildPumptxBuyMicroPlainBlock(o, buyData, opts) {
   const statsLine =
     opts.statsStyle === 'mini'
-      ? `📊 ${formatMarketCapUsd(buyData.marketCapUsd)} · vol ${formatMarketCapUsd(
-          buyData.volumeUsd24h ?? 0,
-        )} · FDV ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`
-      : `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)} | 24h vol: ${formatMarketCapUsd(
-          buyData.volumeUsd24h ?? 0,
-        )} | FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`;
+      ? `📊 ${formatMarketCapUsd(buyData.marketCapUsd)}`
+      : `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)}`;
   const ts = trunc(String(buyData.timestamp || ''), opts.tsMax);
   const parts = [
     '🚀 PUMPTX — BUY DETECTED',
     '',
     `🏛️ ${o.name} ( ${o.sym} )`,
-    `💰 SOL: ${String(buyData.solSpent)} SOL`,
+    `💰 SOL: ${formatSolAmount(buyData.solSpent)} SOL`,
     statsLine,
     `📋 CA: ${o.mint}`,
   ];
@@ -116,14 +111,11 @@ function buildTwitterSafePlainText(buyData) {
   const sym = String(buyData.tokenSymbol || '???').trim();
   const buyerFull = String(buyData.buyerWallet || buyData.buyerWalletShort || '');
 
-  const statsLine = `📊 ${formatMarketCapUsd(buyData.marketCapUsd)} · vol ${formatMarketCapUsd(
-    buyData.volumeUsd24h ?? 0,
-  )} · FDV ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`;
+  const statsLine = `📊 ${formatMarketCapUsd(buyData.marketCapUsd)}`;
   return [
     '🚀 PUMPTX — BUY DETECTED\n', 
     `🏛️ ${name} ( $${sym} )`,
-    `💰 ${String(buyData.solSpent)} SOL`,
-    statsLine,
+    `💰 ${formatSolAmount(buyData.solSpent)} SOL`,
     `📋 CA: ${mintFull}`,
     `👛 Buyer: ${buyerFull}`,
     detailUrl,
@@ -143,10 +135,8 @@ function buildTelegramStylePlainText(buyData) {
     '🚀 PUMPTX — BUY DETECTED',
     '',
     `🏛️ ${buyData.tokenName} ( ${buyData.tokenSymbol} )`,
-    `💰 SOL: ${String(buyData.solSpent)} SOL`,
+    `💰 SOL: ${formatSolAmount(buyData.solSpent)} SOL`,
     `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)}`,
-    `📈 24h vol: ${formatMarketCapUsd(buyData.volumeUsd24h ?? 0)}`,
-    `💎 FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`,
     `📋 CA: ${mint}`,
     `👛 Buyer: ${buyData.buyerWallet}`,
     `🕒 ${buyData.timestamp}`,

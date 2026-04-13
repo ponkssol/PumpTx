@@ -1,6 +1,7 @@
 const fs = require('fs');
 const TelegramBot = require('node-telegram-bot-api');
 const { formatMarketCapUsd } = require('./format-mc');
+const { formatSolAmount } = require('./format-sol');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -29,10 +30,8 @@ async function notify(buyData, imagePathOrBuffer) {
     '🚀 <b>PUMPTX — BUY DETECTED</b>',
     '',
     `🏛️ <b>${escHtml(buyData.tokenName)}</b> (<code>${escHtml(buyData.tokenSymbol)}</code>)`,
-    `💰 <b>SOL:</b> <code>${escHtml(String(buyData.solSpent))} SOL</code>`,
-    `📊 <b>MC:</b> <code>${escHtml(formatMarketCapUsd(buyData.marketCapUsd))}</code>`,
-    `📈 <b>24h vol:</b> <code>${escHtml(formatMarketCapUsd(buyData.volumeUsd24h ?? 0))}</code>`,
-    `💎 <b>FDV:</b> <code>${escHtml(formatMarketCapUsd(buyData.fdvUsd ?? 0))}</code>`,
+    `💰 <b>SOL:</b> <code>${escHtml(formatSolAmount(buyData.solSpent))} SOL</code>`,
+    `📊 <b>MC:</b> <code>${escHtml(formatMarketCapUsd(buyData.marketCapUsd))}</code>`, 
     `📋 <b>CA:</b> <code>${escHtml(mint)}</code>`,
     `👛 <b>Buyer:</b> <code>${escHtml(buyData.buyerWallet || buyData.buyerWalletShort || '')}</code>`,
     `🕒 ${buyData.timestamp}`,
