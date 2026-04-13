@@ -1,16 +1,10 @@
 const { formatMarketCapUsd } = require('./format-mc');
+const { formatSolAmount } = require('./format-sol');
 
 const AUTHOR_GITHUB_URL = 'https://github.com/ponkssol';
 
 /** X post body must stay under ~280 characters (API error 186). */
 const CHAR_MAX = Number(1000);
-
-/** @param {unknown} amount */
-function formatSolAmount(amount) {
-  const n = Number(amount);
-  if (!Number.isFinite(n)) return String(amount);
-  return (Math.trunc(n * 100) / 100).toFixed(2);
-}
 
 /** @param {string} s @param {number} max */
 function trunc(s, max) {
@@ -58,9 +52,7 @@ function buildPumptxBuyPlainBlock(o, buyData) {
  * @param {object} buyData
  */
 function buildPumptxBuyCompactPlainBlock(o, buyData) {
-  const statsLine = `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)} | 24h vol: ${formatMarketCapUsd(
-    buyData.volumeUsd24h ?? 0,
-  )} | FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`;
+  const statsLine = `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)}`;
   const parts = [
     '🚀 PUMPTX — BUY DETECTED',
     '',
@@ -89,12 +81,8 @@ function buildPumptxBuyCompactPlainBlock(o, buyData) {
 function buildPumptxBuyMicroPlainBlock(o, buyData, opts) {
   const statsLine =
     opts.statsStyle === 'mini'
-      ? `📊 ${formatMarketCapUsd(buyData.marketCapUsd)} · vol ${formatMarketCapUsd(
-          buyData.volumeUsd24h ?? 0,
-        )} · FDV ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`
-      : `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)} | 24h vol: ${formatMarketCapUsd(
-          buyData.volumeUsd24h ?? 0,
-        )} | FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`;
+      ? `📊 ${formatMarketCapUsd(buyData.marketCapUsd)}`
+      : `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)}`;
   const ts = trunc(String(buyData.timestamp || ''), opts.tsMax);
   const parts = [
     '🚀 PUMPTX — BUY DETECTED',
@@ -149,8 +137,6 @@ function buildTelegramStylePlainText(buyData) {
     `🏛️ ${buyData.tokenName} ( ${buyData.tokenSymbol} )`,
     `💰 SOL: ${formatSolAmount(buyData.solSpent)} SOL`,
     `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)}`,
-    `📈 24h vol: ${formatMarketCapUsd(buyData.volumeUsd24h ?? 0)}`,
-    `💎 FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`,
     `📋 CA: ${mint}`,
     `👛 Buyer: ${buyData.buyerWallet}`,
     `🕒 ${buyData.timestamp}`,

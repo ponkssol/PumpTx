@@ -2,6 +2,7 @@ const fs = require('fs');
 const axios = require('axios');
 const FormData = require('form-data');
 const { formatMarketCapUsd } = require('./format-mc');
+const { formatSolAmount } = require('./format-sol');
 
 const AUTHOR_GITHUB_URL = 'https://github.com/ponkssol';
 
@@ -57,7 +58,7 @@ function safeMintForFence(mint) {
 function buildEmbedDescription(buyData, detailUrl) {
   const name = escMd(clip(buyData.tokenName || 'Unknown', 200));
   const sym = inlineCode(clip(buyData.tokenSymbol || '—', 40));
-  const sol = inlineCode(`${String(buyData.solSpent)} SOL`);
+  const sol = inlineCode(`${formatSolAmount(buyData.solSpent)} SOL`);
   const mc = inlineCode(formatMarketCapUsd(buyData.marketCapUsd));
   const vol = inlineCode(formatMarketCapUsd(buyData.volumeUsd24h ?? 0));
   const fdv = inlineCode(formatMarketCapUsd(buyData.fdvUsd ?? 0));
@@ -69,9 +70,7 @@ function buildEmbedDescription(buyData, detailUrl) {
   const lines = [
     `🏛️ **${name}** (\`${sym}\`)`,
     `💰 **SOL:** \`${sol}\``,
-    `📊 **MC:** \`${mc}\``,
-    `📈 **24h vol:** \`${vol}\``,
-    `💎 **FDV:** \`${fdv}\``,
+    `📊 **MC:** \`${mc}\``, 
   ];
 
   if (mintRaw.length <= 72) {
