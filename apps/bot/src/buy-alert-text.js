@@ -112,36 +112,19 @@ function buildTwitterSafePlainText(buyData) {
   const t = Number(buyData.blockTimeMs || buyData.blockTime || buyData.timestampMs || Date.now());
   const detailUrl = `${base}/tx/${buyData.signature}?t=${encodeURIComponent(String(t))}`;
   const mintFull = String(buyData.tokenMint || '');
-  const name0 = String(buyData.tokenName || '');
-  const sym0 = String(buyData.tokenSymbol || '???').trim();
+  const name = String(buyData.tokenName || '');
+  const sym = String(buyData.tokenSymbol || '???').trim();
   const buyerFull = String(buyData.buyerWallet || buyData.buyerWalletShort || '');
 
   const statsLine = `📊 ${formatMarketCapUsd(buyData.marketCapUsd)} · vol ${formatMarketCapUsd(
     buyData.volumeUsd24h ?? 0,
   )} · FDV ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`;
-
-  const nameTiers = [80, 64, 48, 36, 28, 20, 16];
-  for (const nameMax of nameTiers) {
-    const name = trunc(name0, nameMax);
-    const sym = trunc(sym0, 16);
-    const text = [
-      '🚀 PUMPTX — BUY DETECTED\n', 
-      `🏛️ ${name} ( $${sym} ) - 💰 ${String(buyData.solSpent)} SOL`,
-      statsLine,
-      `📋 CA: ${mintFull}`,
-      `👛 Buyer: ${buyerFull}`,
-      detailUrl,
-    ].join('\n');
-    return text;
-  }
-
-  const sym = trunc(sym0, 12);
-  const name = trunc(name0, 12);
   return [
-    '🚀 PUMPTX — BUY DETECTED',
-    `CA: ${mintFull}`,
-    `🏛️ ${name} ( ${sym} ) - 💰 ${String(buyData.solSpent)} SOL`,
+    '🚀 PUMPTX — BUY DETECTED\n', 
+    `🏛️ ${name} ( $${sym} )`,
+    `💰 ${String(buyData.solSpent)} SOL`,
     statsLine,
+    `📋 CA: ${mintFull}`,
     `👛 Buyer: ${buyerFull}`,
     detailUrl,
   ].join('\n');

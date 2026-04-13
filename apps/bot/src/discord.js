@@ -61,7 +61,7 @@ function buildEmbedDescription(buyData, detailUrl) {
   const mc = inlineCode(formatMarketCapUsd(buyData.marketCapUsd));
   const vol = inlineCode(formatMarketCapUsd(buyData.volumeUsd24h ?? 0));
   const fdv = inlineCode(formatMarketCapUsd(buyData.fdvUsd ?? 0));
-  const buyer = inlineCode(buyData.buyerWalletShort || buyData.buyerWallet || '');
+  const buyer = inlineCode(buyData.buyerWallet || buyData.buyerWalletShort || '');
   const mintRaw = buyData.tokenMint || '';
   const ts = escMd(buyData.timestamp || '');
 
