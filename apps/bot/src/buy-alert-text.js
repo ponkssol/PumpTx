@@ -3,7 +3,7 @@ const { formatMarketCapUsd } = require('./format-mc');
 const AUTHOR_GITHUB_URL = 'https://github.com/ponkssol';
 
 /** X post body must stay under ~280 characters (API error 186). */
-const CHAR_MAX = Number(process.env.TWITTER_CHAR_MAX || 280);
+const CHAR_MAX = Number(1000);
 
 /** @param {string} s @param {number} max */
 function trunc(s, max) {
@@ -125,14 +125,14 @@ function buildTwitterSafePlainText(buyData) {
     const name = trunc(name0, nameMax);
     const sym = trunc(sym0, 16);
     const text = [
-      '🚀 PUMPTX — BUY DETECTED',
-      `CA: ${mintFull}`,
-      `🏛️ ${name} ( ${sym} ) - 💰 ${String(buyData.solSpent)} SOL`,
+      '🚀 PUMPTX — BUY DETECTED\n', 
+      `🏛️ ${name} ( $${sym} ) - 💰 ${String(buyData.solSpent)} SOL`,
       statsLine,
+      `📋 CA: ${mintFull}`,
       `👛 Buyer: ${buyerFull}`,
       detailUrl,
     ].join('\n');
-    if (text.length <= CHAR_MAX) return text;
+    return text;
   }
 
   const sym = trunc(sym0, 12);

@@ -51,7 +51,7 @@ async function createTweetV2(tweetText, loginCookies) {
       login_cookies: loginCookies,
       tweet_text: bodyText,
       proxy: process.env.TWITTER_PROXY_URL || '',
-      is_note_tweet: false,
+      is_note_tweet: true,
     },
     {
       headers: twitterHeaders(),
