@@ -1,88 +1,69 @@
-'use client';
-
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Metadata } from 'next';
 import type { RecentBuySummary, Transaction } from '@/lib/db';
-import TerminalHeader from '@/components/TerminalHeader';
-import TransactionDetail from '@/components/TransactionDetail';
-import styles from './page.module.css';
+import { getRecentBuysSameMint, getTxBySignature } from '@/lib/db';
+import TxClient from '../_components/TxClient';
 
-export default function TxPage() {
-  const params = useParams<{ signature: string }>();
-  const signature = useMemo(() => decodeURIComponent(params.signature), [params.signature]);
-  const [tx, setTx] = useState<Transaction | null | undefined>(undefined);
-  const [recentSameMint, setRecentSameMint] = useState<RecentBuySummary[]>([]);
-  const [toast, setToast] = useState<string | null>(null);
+function toAbsoluteUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const base =
+    process.env.BOT_BASE_URL ??
+    process.env.NEXT_PUBLIC_BASE_URL ??
+    'http://localhost:3000';
+  try {
+    return new URL(raw, base).toString();
+  } catch {
+    return null;
+  }
+}
 
-  const flash = useCallback((msg: string) => {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2000);
-  }, []);
+export async function generateMetadata({ params }: { params: { signature: string } }): Promise<Metadata> {
+  const signature = decodeURIComponent(params.signature);
+  const tx = getTxBySignature(signature);
 
-  const onCopy = useCallback(
-    async (text: string) => {
-      try {
-        await navigator.clipboard.writeText(text);
-        flash('// COPIED TO CLIPBOARD');
-      } catch {
-        flash('// COPY FAILED');
-      }
-    },
-    [flash],
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/transactions/${encodeURIComponent(signature)}`, { cache: 'no-store' });
-        const data = await res.json();
-        if (cancelled) return;
-        if (res.status === 404) {
-          setTx(null);
-          setRecentSameMint([]);
-        } else if (!res.ok) {
-          setTx(null);
-          setRecentSameMint([]);
-        } else {
-          const { recent_same_mint: recent, ...row } = data as Transaction & {
-            recent_same_mint?: RecentBuySummary[];
-          };
-          setTx(row as Transaction);
-          setRecentSameMint(Array.isArray(recent) ? recent : []);
-        }
-      } catch {
-        if (!cancelled) {
-          setTx(null);
-          setRecentSameMint([]);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
+  if (!tx) {
+    return {
+      title: 'Transaction not found — PumpTx',
+      description: 'Transaction not found',
     };
-  }, [signature]);
+  }
+
+  const image = toAbsoluteUrl(tx.image_url ?? tx.token_icon_url ?? null);
+  const title = `${tx.token_symbol || tx.token_name || 'Transaction'} — PumpTx`;
+  const description = `PumpFun BUY • ${tx.sol_spent} SOL • ${tx.token_amount} ${tx.token_symbol || ''}`.trim();
+  const metadataBase = new URL(process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000');
+
+  return {
+    metadataBase,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'article',
+      images: image ? [{ url: image }] : undefined,
+    },
+    twitter: {
+      card: image ? 'summary_large_image' : 'summary',
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
+  };
+}
+
+export default async function TxPage({ params }: { params: { signature: string } }) {
+  const signature = decodeURIComponent(params.signature);
+  const tx = getTxBySignature(signature) ?? null;
+  const recentSameMint: RecentBuySummary[] = tx
+    ? getRecentBuysSameMint(tx.token_mint, tx.signature, 20)
+    : [];
 
   return (
-    <div className={styles.page}>
-      <TerminalHeader />
-      <main className={styles.main}>
-        <div className={styles.toolbar}>
-          <Link className={styles.back} href="/">
-            ← Back to feed
-          </Link>
-          <div className={styles.h}>Transaction detail</div>
-        </div>
-
-        {tx === undefined ? <div className={styles.loading}>// LOADING…</div> : null}
-        {tx === null ? (
-          <div className={styles.err}>// 404 — TRANSACTION NOT FOUND</div>
-        ) : null}
-        {tx ? <TransactionDetail tx={tx} recentSameMint={recentSameMint} onCopy={onCopy} /> : null}
-
-        {toast ? <div className={styles.toast}>{toast}</div> : null}
-      </main>
-    </div>
+    <TxClient
+      signature={signature}
+      initialTx={tx as Transaction | null}
+      initialRecentSameMint={recentSameMint}
+    />
   );
 }
