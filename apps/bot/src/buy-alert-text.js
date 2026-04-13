@@ -3,7 +3,7 @@ const { formatMarketCapUsd } = require('./format-mc');
 const AUTHOR_GITHUB_URL = 'https://github.com/ponkssol';
 
 /** X post body must stay under ~280 characters (API error 186). */
-const CHAR_MAX = Number(1000);
+const CHAR_MAX = Number(280);
 
 /** @param {string} s @param {number} max */
 function trunc(s, max) {

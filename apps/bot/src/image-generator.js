@@ -119,7 +119,7 @@ async function tryLoadTokenIconPng(url, size) {
  */
 async function generateImage(buyData, opts = {}) {
   const persistToDisk = opts.persistToDisk !== false;
-  const baseUrl = (process.env.BOT_BASE_URL || `http://localhost:${process.env.BOT_PORT || 4000}`).replace(/\/$/, '');
+  const baseUrl = (process.env.BOT_BASE_URL).replace(/\/$/, '');
   const hasLogo = fs.existsSync(LOGO_PATH);
 
   const rx = W - L.pad;
