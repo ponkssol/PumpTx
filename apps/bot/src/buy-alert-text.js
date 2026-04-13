@@ -5,6 +5,13 @@ const AUTHOR_GITHUB_URL = 'https://github.com/ponkssol';
 /** X post body must stay under ~280 characters (API error 186). */
 const CHAR_MAX = Number(1000);
 
+/** @param {unknown} amount */
+function formatSolAmount(amount) {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return String(amount);
+  return (Math.trunc(n * 100) / 100).toFixed(2);
+}
+
 /** @param {string} s @param {number} max */
 function trunc(s, max) {
   const t = String(s);
@@ -28,7 +35,7 @@ function buildPumptxBuyPlainBlock(o, buyData) {
     '🚀 PUMPTX — BUY DETECTED',
     '',
     `🏛️ ${o.name} ( ${o.sym} )`,
-    `💰 SOL: ${String(buyData.solSpent)} SOL`,
+    `💰 SOL: ${formatSolAmount(buyData.solSpent)} SOL`,
     `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)}`,
     `📈 24h vol: ${formatMarketCapUsd(buyData.volumeUsd24h ?? 0)}`,
     `💎 FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`,
@@ -58,7 +65,7 @@ function buildPumptxBuyCompactPlainBlock(o, buyData) {
     '🚀 PUMPTX — BUY DETECTED',
     '',
     `🏛️ ${o.name} ( ${o.sym} )`,
-    `💰 SOL: ${String(buyData.solSpent)} SOL`,
+    `💰 SOL: ${formatSolAmount(buyData.solSpent)} SOL`,
     statsLine,
     `📋 CA: ${o.mint}`,
     `👛 Buyer: ${o.buyer}`,
@@ -93,7 +100,7 @@ function buildPumptxBuyMicroPlainBlock(o, buyData, opts) {
     '🚀 PUMPTX — BUY DETECTED',
     '',
     `🏛️ ${o.name} ( ${o.sym} )`,
-    `💰 SOL: ${String(buyData.solSpent)} SOL`,
+    `💰 SOL: ${formatSolAmount(buyData.solSpent)} SOL`,
     statsLine,
     `📋 CA: ${o.mint}`,
   ];
@@ -116,14 +123,11 @@ function buildTwitterSafePlainText(buyData) {
   const sym = String(buyData.tokenSymbol || '???').trim();
   const buyerFull = String(buyData.buyerWallet || buyData.buyerWalletShort || '');
 
-  const statsLine = `📊 ${formatMarketCapUsd(buyData.marketCapUsd)} · vol ${formatMarketCapUsd(
-    buyData.volumeUsd24h ?? 0,
-  )} · FDV ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`;
+  const statsLine = `📊 ${formatMarketCapUsd(buyData.marketCapUsd)}`;
   return [
     '🚀 PUMPTX — BUY DETECTED\n', 
     `🏛️ ${name} ( $${sym} )`,
-    `💰 ${String(buyData.solSpent)} SOL`,
-    statsLine,
+    `💰 ${formatSolAmount(buyData.solSpent)} SOL`,
     `📋 CA: ${mintFull}`,
     `👛 Buyer: ${buyerFull}`,
     detailUrl,
@@ -143,7 +147,7 @@ function buildTelegramStylePlainText(buyData) {
     '🚀 PUMPTX — BUY DETECTED',
     '',
     `🏛️ ${buyData.tokenName} ( ${buyData.tokenSymbol} )`,
-    `💰 SOL: ${String(buyData.solSpent)} SOL`,
+    `💰 SOL: ${formatSolAmount(buyData.solSpent)} SOL`,
     `📊 MC: ${formatMarketCapUsd(buyData.marketCapUsd)}`,
     `📈 24h vol: ${formatMarketCapUsd(buyData.volumeUsd24h ?? 0)}`,
     `💎 FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`,

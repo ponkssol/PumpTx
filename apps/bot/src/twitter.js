@@ -108,26 +108,18 @@ async function tweet(buyData, _imagePathOrBuffer) {
 
   const tweetText = buildTwitterSafePlainText(buyData);
 
-  let cookies = getTwitterLoginCookies();
-  if (!cookies) {
-    await userLoginV2();
-    cookies = getTwitterLoginCookies();
-  }
-
-  const runCreate = async () => {
-    const c = getTwitterLoginCookies();
-    if (!c) throw new Error('Twitter login cookies missing after login');
-    return createTweetV2(tweetText, c);
-  };
+  const runCreate = async (cookies) => createTweetV2(tweetText, cookies || '');
 
   let first;
   try {
-    first = await runCreate();
+    first = await runCreate(getTwitterLoginCookies());
   } catch (e) {
     const msg = e && e.message ? e.message : String(e);
     log.warn(`Twitter create_tweet_v2 request error: ${msg}`);
     await userLoginV2();
-    const second = await runCreate();
+    const fresh = getTwitterLoginCookies();
+    if (!fresh) throw new Error('Twitter login cookies missing after login');
+    const second = await runCreate(fresh);
     if (!(second.httpStatus >= 200 && second.httpStatus < 300 && isApiSuccess(second.data))) {
       throw new Error(`Twitter create_tweet_v2 failed after login: http=${second.httpStatus} body=${safeJson(second.data)}`);
     }
@@ -140,7 +132,9 @@ async function tweet(buyData, _imagePathOrBuffer) {
 
   log.warn(`Twitter create_tweet_v2 failed: http=${first.httpStatus} body=${safeJson(first.data)}`);
   await userLoginV2();
-  const retry = await runCreate();
+  const fresh = getTwitterLoginCookies();
+  if (!fresh) throw new Error('Twitter login cookies missing after login');
+  const retry = await runCreate(fresh);
   if (!(retry.httpStatus >= 200 && retry.httpStatus < 300 && isApiSuccess(retry.data))) {
     throw new Error(`Twitter create_tweet_v2 failed after re-login: http=${retry.httpStatus} body=${safeJson(retry.data)}`);
   }
