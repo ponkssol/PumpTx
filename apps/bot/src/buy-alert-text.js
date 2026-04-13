@@ -112,120 +112,38 @@ function buildTwitterSafePlainText(buyData) {
   const t = Number(buyData.blockTimeMs || buyData.blockTime || buyData.timestampMs || Date.now());
   const detailUrl = `${base}/tx/${buyData.signature}?t=${encodeURIComponent(String(t))}`;
   const mintFull = String(buyData.tokenMint || '');
-  const pump = String(buyData.pumpFunUrl || '');
-  const scan = String(buyData.solscanUrl || '');
   const name0 = String(buyData.tokenName || '');
   const sym0 = String(buyData.tokenSymbol || '???').trim();
   const buyerFull = String(buyData.buyerWallet || buyData.buyerWalletShort || '');
 
-  const linkAll = `PumpFun: ${pump} | Solscan: ${scan} | PumpTx Detail: ${detailUrl}`;
-  const linkDetailOnly = `PumpTx Detail: ${detailUrl}`;
-  const linkUrlOnly = `${detailUrl}`;
+  const statsLine = `📊 ${formatMarketCapUsd(buyData.marketCapUsd)} · vol ${formatMarketCapUsd(
+    buyData.volumeUsd24h ?? 0,
+  )} · FDV ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`;
 
-  const shortMint = mintFull.length > 24 ? `${mintFull.slice(0, 10)}…${mintFull.slice(-8)}` : mintFull;
-  const shortMint2 = mintFull.length > 18 ? `${mintFull.slice(0, 6)}…${mintFull.slice(-4)}` : mintFull;
-
-  /** @type {{ nameMax: number, buyerMax: number, mint: string, link: 'all'|'detail', footer: boolean }[]} */
-  const tiers = [
-    { nameMax: 200, buyerMax: 9999, mint: mintFull, link: 'all', footer: true },
-    { nameMax: 72, buyerMax: 9999, mint: mintFull, link: 'all', footer: true },
-    { nameMax: 56, buyerMax: 9999, mint: mintFull, link: 'all', footer: true },
-    { nameMax: 48, buyerMax: 9999, mint: mintFull, link: 'all', footer: true },
-    { nameMax: 40, buyerMax: 9999, mint: mintFull, link: 'detail', footer: true },
-    { nameMax: 36, buyerMax: 9999, mint: shortMint, link: 'detail', footer: true },
-    { nameMax: 32, buyerMax: 9999, mint: shortMint2, link: 'detail', footer: false },
-  ];
-
-  for (const t of tiers) {
-    const name = trunc(name0, t.nameMax);
-    const sym = trunc(sym0, 20);
-    const linkRow = t.link === 'all' ? linkAll : linkDetailOnly;
-    const statsLine = `📊 ${formatMarketCapUsd(buyData.marketCapUsd)} · vol ${formatMarketCapUsd(
-      buyData.volumeUsd24h ?? 0,
-    )} · FDV ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`;
-    const buyer = trunc(buyerFull, t.buyerMax);
-    const text = [
-      '🚀 PUMPTX — BUY DETECTED',
-      `🏛️ ${name} ( ${sym} ) -> 💰 SOL: ${String(buyData.solSpent)} SOL`,
-      statsLine,
-      `📋 CA: ${t.mint}`,
-      `👛 Buyer: ${buyer}`,
-      `🕒 ${buyData.timestamp}`,
-      linkRow,
-      ...(t.footer ? ['', `powered by PumpTx · by ponks ${AUTHOR_GITHUB_URL}`] : []),
-    ].join('\n');
-    if (text.length <= CHAR_MAX) return text;
-  }
-
-  /** @type {{ nameMax: number, buyerMax: number, mint: string, link: 'all'|'detail', footer: boolean }[]} */
-  const compactTiers = [
-    { nameMax: 56, buyerMax: 9999, mint: mintFull, link: 'detail', footer: true },
-    { nameMax: 44, buyerMax: 9999, mint: shortMint, link: 'detail', footer: true },
-    { nameMax: 36, buyerMax: 9999, mint: shortMint2, link: 'detail', footer: true },
-    { nameMax: 28, buyerMax: 9999, mint: shortMint2, link: 'detail', footer: false },
-  ];
-
-  for (const t of compactTiers) {
-    const name = trunc(name0, t.nameMax);
+  const nameTiers = [80, 64, 48, 36, 28, 20, 16];
+  for (const nameMax of nameTiers) {
+    const name = trunc(name0, nameMax);
     const sym = trunc(sym0, 16);
-    const linkRow = t.link === 'all' ? linkAll : linkDetailOnly;
-    const statsLine = `📊 ${formatMarketCapUsd(buyData.marketCapUsd)} · vol ${formatMarketCapUsd(
-      buyData.volumeUsd24h ?? 0,
-    )} · FDV ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`;
-    const buyer = trunc(buyerFull, t.buyerMax);
     const text = [
       '🚀 PUMPTX — BUY DETECTED',
-      `🏛️ ${name} ( ${sym} ) -> 💰 SOL: ${String(buyData.solSpent)} SOL`,
+      `CA: ${mintFull}`,
+      `🏛️ ${name} ( ${sym} ) - 💰 ${String(buyData.solSpent)} SOL`,
       statsLine,
-      `📋 CA: ${t.mint}`,
-      `👛 Buyer: ${buyer}`,
-      `🕒 ${buyData.timestamp}`,
-      linkRow,
-      ...(t.footer ? ['', `powered by PumpTx · by ponks ${AUTHOR_GITHUB_URL}`] : []),
+      `👛 Buyer: ${buyerFull}`,
+      detailUrl,
     ].join('\n');
     if (text.length <= CHAR_MAX) return text;
   }
 
-  const microTiers = [
-    { nameMax: 24, buyerMax: 16, mint: shortMint2, link: linkUrlOnly, buyer: true, tsMax: 24, stats: 'full' },
-    { nameMax: 22, buyerMax: 14, mint: shortMint2, link: linkUrlOnly, buyer: true, tsMax: 22, stats: 'mini' },
-    { nameMax: 20, buyerMax: 12, mint: `${mintFull.slice(0, 4)}…${mintFull.slice(-4)}`, link: linkUrlOnly, buyer: true, tsMax: 20, stats: 'mini' },
-    { nameMax: 20, buyerMax: 12, mint: `${mintFull.slice(0, 4)}…${mintFull.slice(-4)}`, link: linkUrlOnly, buyer: true, tsMax: 17, stats: 'mini' },
-    { nameMax: 18, buyerMax: 12, mint: `${mintFull.slice(0, 4)}…${mintFull.slice(-4)}`, link: linkUrlOnly, buyer: false, tsMax: 18, stats: 'mini' },
-  ];
-
-  for (const m of microTiers) {
-    const name = trunc(name0, m.nameMax);
-    const sym = trunc(sym0, 12);
-    const buyer = trunc(buyerFull, m.buyerMax);
-    const statsLine = `📊 ${formatMarketCapUsd(buyData.marketCapUsd)} · vol ${formatMarketCapUsd(
-      buyData.volumeUsd24h ?? 0,
-    )} · FDV ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`;
-    const ts = trunc(String(buyData.timestamp || ''), m.tsMax);
-    const text = [
-      '🚀 PUMPTX — BUY DETECTED',
-      `🏛️ ${name} ( ${sym} ) -> 💰 SOL: ${String(buyData.solSpent)} SOL`,
-      statsLine,
-      `📋 CA: ${m.mint}`,
-      ...(m.buyer ? [`👛 Buyer: ${buyer}`] : []),
-      `🕒 ${ts}`,
-      m.link,
-    ].join('\n');
-    if (text.length <= CHAR_MAX) return text;
-  }
-
-  const sym = trunc(sym0, 10);
-  const name = trunc(name0, 18);
+  const sym = trunc(sym0, 12);
+  const name = trunc(name0, 12);
   return [
     '🚀 PUMPTX — BUY DETECTED',
-    `🏛️ ${name} ( ${sym} ) -> 💰 SOL: ${String(buyData.solSpent)} SOL`,
-    `📊 ${formatMarketCapUsd(buyData.marketCapUsd)} · vol ${formatMarketCapUsd(
-      buyData.volumeUsd24h ?? 0,
-    )} · FDV ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`,
-    `📋 CA: ${mintFull}`,
+    `CA: ${mintFull}`,
+    `🏛️ ${name} ( ${sym} ) - 💰 ${String(buyData.solSpent)} SOL`,
+    statsLine,
     `👛 Buyer: ${buyerFull}`,
-    `🕒 ${trunc(String(buyData.timestamp || ''), 14)}`,
-    linkUrlOnly,
+    detailUrl,
   ].join('\n');
 }
 
@@ -247,7 +165,7 @@ function buildTelegramStylePlainText(buyData) {
     `📈 24h vol: ${formatMarketCapUsd(buyData.volumeUsd24h ?? 0)}`,
     `💎 FDV: ${formatMarketCapUsd(buyData.fdvUsd ?? 0)}`,
     `📋 CA: ${mint}`,
-    `👛 Buyer: ${formatBuyerWalletPreview(buyData.buyerWallet || buyData.buyerWalletShort || '')}`,
+    `👛 Buyer: ${buyData.buyerWallet}`,
     `🕒 ${buyData.timestamp}`,
     '',
     `🔗 PumpFun: ${buyData.pumpFunUrl} | Solscan: ${buyData.solscanUrl} | PumpTx Detail: ${detailUrl}`,
