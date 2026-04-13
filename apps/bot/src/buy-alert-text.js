@@ -110,7 +110,8 @@ function buildPumptxBuyMicroPlainBlock(o, buyData, opts) {
  */
 function buildTwitterSafePlainText(buyData) {
   const base = (process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '');
-  const detailUrl = `${base}/tx/${buyData.signature}`;
+  const t = Number(buyData.blockTimeMs || buyData.blockTime || buyData.timestampMs || Date.now());
+  const detailUrl = `${base}/tx/${buyData.signature}?t=${encodeURIComponent(String(t))}`;
   const mintFull = String(buyData.tokenMint || '');
   const pump = String(buyData.pumpFunUrl || '');
   const scan = String(buyData.solscanUrl || '');

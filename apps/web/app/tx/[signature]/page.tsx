@@ -32,11 +32,11 @@ export async function generateMetadata({ params }: { params: { signature: string
   }
 
   const metadataBase = new URL(process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000');
-  const hasImage = Boolean(toAbsoluteUrl(tx.image_url ?? tx.token_icon_url ?? null));
-  const image = hasImage ? new URL(`/api/og/tx/${encodeURIComponent(signature)}`, metadataBase).toString() : null;
+  const image = toAbsoluteUrl(tx.image_url ?? null) ?? toAbsoluteUrl(tx.token_icon_url ?? null);
   const canonical = new URL(`/tx/${encodeURIComponent(signature)}`, metadataBase).toString();
-  const title = `${tx.token_symbol || tx.token_name || 'Transaction'} — PumpTx`;
-  const description = `PumpFun BUY • ${tx.sol_spent} SOL • ${tx.token_amount} ${tx.token_symbol || ''}`.trim();
+  const tokenName = tx.token_name || tx.token_symbol || 'Token';
+  const title = `PUMPTX — BUY DETECTED | ${tokenName}`;
+  const description = `New buy transaction • Amount: ${tx.sol_spent} SOL • Token: ${tx.token_symbol || tokenName}`.trim();
 
   return {
     metadataBase,
@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: { params: { signature: string
     openGraph: {
       title,
       description,
-      type: 'article',
+      type: 'website',
       url: canonical,
       images: image
         ? [
@@ -53,7 +53,7 @@ export async function generateMetadata({ params }: { params: { signature: string
               url: image,
               width: 1200,
               height: 630,
-              alt: `${tx.token_symbol || tx.token_name || 'Transaction'} share card`,
+              alt: `PUMPTX — BUY DETECTED | ${tokenName}`,
             },
           ]
         : undefined,
