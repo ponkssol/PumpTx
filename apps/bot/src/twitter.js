@@ -32,7 +32,11 @@ function twitterBaseUrl() {
  * @param {unknown} data
  */
 function isApiSuccess(data) {
-  return Boolean(data && typeof data === 'object' && String(data.status || '').toLowerCase() === 'success');
+  if (!data || typeof data !== 'object') return false;
+  if (String(data.status || '').toLowerCase() !== 'success') return false;
+  // twitterapi.io create_tweet_v2 success payload includes tweet_id.
+  // Example: { status: "success", message: "post tweet success.", tweet_id: "..." }
+  return Boolean(data.tweet_id);
 }
 
 /**
