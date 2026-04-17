@@ -45,9 +45,10 @@ export default function TerminalHeader() {
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
-  const telegramHref = process.env.NEXT_PUBLIC_SOCIAL_TELEGRAM_URL?.trim() || 'https://telegram.org';
-  const xHref = process.env.NEXT_PUBLIC_SOCIAL_X_URL?.trim() || 'https://x.com';
-  const discordHref = process.env.NEXT_PUBLIC_SOCIAL_DISCORD_URL?.trim() || 'https://discord.com';
+  const websiteHref = 'https://pumptx.fun/';
+  const telegramHref = 'https://t.me/pumptx';
+  const xHref = 'https://x.com/pumptx_labs';
+  const discordHref = 'https://discord.gg/jDdjBy34av';
 
   useEffect(() => {
     setMounted(true);
@@ -60,7 +61,9 @@ export default function TerminalHeader() {
     <header className={styles.bar}>
       <div className={styles.inner}>
         <div className={styles.lead}>
-          <img className={styles.brandLogo} src="/pumptx-logo.png" alt="PumpTx" width={96} height={20} />
+          <a href={websiteHref} target="_blank" rel="noopener noreferrer" aria-label="PumpTx Website">
+            <img className={styles.brandLogo} src="/pumptx-logo.png" alt="PumpTx" width={96} height={20} />
+          </a>
         </div>
         <div className={styles.trail}>
           <div className={styles.social}>
