@@ -6,6 +6,8 @@ import TerminalHeader from '@/components/TerminalHeader';
 import StatsBanner from '@/components/StatsBanner';
 import TransactionFeed from '@/components/TransactionFeed';
 import DashboardDetailPanel from '@/components/DashboardDetailPanel';
+import DetailModal from '@/components/DetailModal';
+import { useIsStackedDashboard } from '@/hooks/useMediaQuery';
 import styles from './page.module.css';
 
 type Stats = {
@@ -28,6 +30,7 @@ export default function HomePage() {
   const [selectedSig, setSelectedSig] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const prevTop = useRef<number | undefined>(undefined);
+  const isStackedDashboard = useIsStackedDashboard();
 
   const selectedTx = useMemo(
     () => (selectedSig ? txs.find((t) => t.signature === selectedSig) ?? null : null),
@@ -39,14 +42,25 @@ export default function HomePage() {
     return txs.some((t) => t.signature === selectedSig) ? null : selectedSig;
   }, [txs, selectedSig]);
 
-  /** Detail: newest row until user picks a row; after pick, that row (orphan falls back to newest preview). */
+  /** Detail: sidebar desktop (≥1280px) shows newest until pick; layout bertumpuk pakai modal setelah baris diklik. */
   const detailTx = useMemo(() => {
     if (!txs.length) return null;
+    if (isStackedDashboard) {
+      if (selectedSig === null) return null;
+      if (orphanSignature) return txs[0];
+      return selectedTx;
+    }
     if (selectedSig === null || orphanSignature) return txs[0];
     return selectedTx;
-  }, [txs, selectedSig, orphanSignature, selectedTx]);
+  }, [txs, selectedSig, orphanSignature, selectedTx, isStackedDashboard]);
 
-  const feedSelectedSignature = selectedSig ?? txs[0]?.signature ?? null;
+  const feedSelectedSignature = useMemo(() => {
+    if (isStackedDashboard) return selectedSig;
+    return selectedSig ?? txs[0]?.signature ?? null;
+  }, [isStackedDashboard, selectedSig, txs]);
+
+  const showDetailModal =
+    isStackedDashboard && !loading && Boolean(selectedSig) && txs.length > 0;
 
   const flash = useCallback((msg: string) => {
     setToast(msg);
@@ -136,14 +150,16 @@ export default function HomePage() {
                   onSelect={(t) => setSelectedSig(t.signature)}
                 />
               </div>
-              <div className={styles.paneDetail}>
-                <DashboardDetailPanel
-                  tx={detailTx}
-                  orphanSignature={orphanSignature}
-                  feedEmpty={!loading && txs.length === 0}
-                  onCopy={onCopy}
-                />
-              </div>
+              {!isStackedDashboard ? (
+                <div className={styles.paneDetail}>
+                  <DashboardDetailPanel
+                    tx={detailTx}
+                    orphanSignature={orphanSignature}
+                    feedEmpty={!loading && txs.length === 0}
+                    onCopy={onCopy}
+                  />
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -151,6 +167,17 @@ export default function HomePage() {
           {statusLine}
         </footer>
       </main>
+      {showDetailModal ? (
+        <DetailModal onClose={() => setSelectedSig(null)}>
+          <DashboardDetailPanel
+            tx={detailTx}
+            orphanSignature={orphanSignature}
+            feedEmpty={!loading && txs.length === 0}
+            onCopy={onCopy}
+            hideChrome
+          />
+        </DetailModal>
+      ) : null}
       {toast ? <div className={styles.toast}>{toast}</div> : null}
     </div>
   );

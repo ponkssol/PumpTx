@@ -13,6 +13,7 @@
   cursor: pointer;
   transition: background 0.1s ease;
   min-width: 0;
+  touch-action: manipulation;
 }
 
 .card:hover {

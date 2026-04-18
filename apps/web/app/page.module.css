@@ -26,29 +26,18 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
+/* Mobile: column flex keeps a bounded height chain so the feed scroll + detail both work (iOS/Safari). */
 .dashboard {
   flex: 1;
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: minmax(200px, 1fr) auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   gap: 0;
-  min-height: min(78vh, 820px);
   border: 1px solid var(--border);
   background: var(--bg-primary);
-}
-
-@media (min-width: 1024px) {
-  .dashboard {
-    grid-template-columns: minmax(0, 1fr) minmax(300px, 38%);
-    grid-template-rows: 1fr;
-    min-height: min(78vh, 860px);
-  }
-
-  .paneDetail {
-    border-left: 1px solid var(--border);
-  }
 }
 
 .paneList,
@@ -60,18 +49,63 @@
 }
 
 .paneList {
+  flex: 1;
   overflow: hidden;
-  /* Clip any paint bleed so wide rows never draw under the detail column */
-  contain: paint;
 }
 
 .paneDetail {
-  max-height: 70vh;
+  flex: 0 1 auto;
+  max-height: min(52vh, 560px);
+  overflow: hidden;
+  border-top: 1px solid var(--border);
 }
 
-@media (min-width: 1024px) {
+/* Tablet & mobile: document can scroll vertically; inner panes are not locked to one screen. */
+@media (max-width: 1279px) {
+  .main {
+    flex: 0 0 auto;
+  }
+
+  .window {
+    flex: none;
+    overflow: visible;
+  }
+
+  .dashboard {
+    flex: none;
+  }
+
+  .paneList {
+    flex: none;
+    overflow: visible;
+  }
+
   .paneDetail {
+    flex: none;
     max-height: none;
+    overflow: visible;
+  }
+}
+
+@media (min-width: 1280px) {
+  .dashboard {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 38%);
+    grid-template-rows: 1fr;
+    min-height: min(78vh, 860px);
+  }
+
+  .paneList {
+    flex: initial;
+    contain: paint;
+  }
+
+  .paneDetail {
+    flex: initial;
+    max-height: none;
+    overflow: visible;
+    border-top: none;
+    border-left: 1px solid var(--border);
   }
 }
 
