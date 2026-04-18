@@ -41,14 +41,36 @@ function IconDiscord({ className }: { className?: string }) {
   );
 }
 
+function IconCopy({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width={16} height={16} aria-hidden focusable={false}>
+      <path
+        fill="currentColor"
+        d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
+      />
+    </svg>
+  );
+}
+
+function IconCheck({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width={16} height={16} aria-hidden focusable={false}>
+      <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+    </svg>
+  );
+}
+
 export default function TerminalHeader() {
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [contractCopied, setContractCopied] = useState(false);
 
   const websiteHref = 'https://pumptx.fun/';
   const telegramHref = 'https://t.me/pumptx';
   const xHref = 'https://x.com/pumptx_labs';
-  const discordHref = 'https://discord.gg/jDdjBy34av';
+  const discordHref = 'https://discord.gg/nCf5cmTRHG';
+
+  const contractAddress = 'xxxxxxxxxxxxxxxxxxpump';
 
   useEffect(() => {
     setMounted(true);
@@ -57,6 +79,29 @@ export default function TerminalHeader() {
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    if (!contractCopied) return;
+    const t = window.setTimeout(() => setContractCopied(false), 2000);
+    return () => window.clearTimeout(t);
+  }, [contractCopied]);
+
+  const copyContractAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(contractAddress);
+      setContractCopied(true);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = contractAddress;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setContractCopied(true);
+    }
+  };
+
   return (
     <header className={styles.bar}>
       <div className={styles.inner}>
@@ -64,6 +109,25 @@ export default function TerminalHeader() {
           <a href={websiteHref} target="_blank" rel="noopener noreferrer" aria-label="PumpTx Website">
             <img className={styles.brandLogo} src="/pumptx-logo.png" alt="PumpTx" width={96} height={20} />
           </a>
+        </div>
+        <div className={styles.contract} title={contractAddress}>
+          <span className={styles.contractLabel}>Contract address</span>
+          <div className={styles.contractRow}>
+            <code className={styles.contractValue}>{contractAddress}</code>
+            <button
+              type="button"
+              className={styles.copyBtn}
+              onClick={() => void copyContractAddress()}
+              title={contractCopied ? 'Copied' : 'Copy'}
+              aria-label={contractCopied ? 'Copied' : 'Copy contract address'}
+            >
+              {contractCopied ? (
+                <IconCheck className={styles.copyIcon} />
+              ) : (
+                <IconCopy className={styles.copyIcon} />
+              )}
+            </button>
+          </div>
         </div>
         <div className={styles.trail}>
           <div className={styles.social}>
