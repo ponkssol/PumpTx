@@ -68,7 +68,7 @@ export default function TerminalHeader() {
   const websiteHref = 'https://pumptx.fun/';
   const telegramHref = 'https://t.me/pumptx';
   const xHref = 'https://x.com/pumptx_labs';
-  const discordHref = 'https://discord.gg/nCf5cmTRHG';
+  const discordHref = 'https://discord.gg/TswVzMSYwy';
 
   const contractAddress = 'xxxxxxxxxxxxxxxxxxpump';
 
