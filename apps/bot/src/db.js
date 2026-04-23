@@ -76,6 +76,7 @@ async function initDb() {
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS volume_24h_usd DOUBLE PRECISION DEFAULT 0;
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS fdv_usd DOUBLE PRECISION DEFAULT 0;
     ALTER TABLE telegram_groups ALTER COLUMN is_active SET DEFAULT 0;
+    ALTER TABLE telegram_groups ADD COLUMN IF NOT EXISTS group_url TEXT;
   `);
 }
 
@@ -160,20 +161,23 @@ async function updateStats(solSpent) {
  *  ownerUserId: string,
  *  ownerUsername?: string|null,
  *  minSol: number,
- *  minMcap: number
+ *  minMcap: number,
+ *  groupUrl?: string|null
  * }} group
  */
 async function upsertTelegramGroup(group) {
+  const url = group.groupUrl && String(group.groupUrl).trim() ? String(group.groupUrl).trim() : null;
   await getDb().query(`
     INSERT INTO telegram_groups (
-      group_id, group_title, owner_user_id, owner_username, min_sol, min_mcap, is_active, updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, 0, now())
+      group_id, group_title, owner_user_id, owner_username, min_sol, min_mcap, group_url, is_active, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, now())
     ON CONFLICT(group_id) DO UPDATE SET
       group_title = excluded.group_title,
       owner_user_id = excluded.owner_user_id,
       owner_username = excluded.owner_username,
       min_sol = excluded.min_sol,
       min_mcap = excluded.min_mcap,
+      group_url = COALESCE(NULLIF(TRIM(excluded.group_url), ''), telegram_groups.group_url),
       updated_at = now()
   `, [
     group.groupId,
@@ -182,6 +186,7 @@ async function upsertTelegramGroup(group) {
     group.ownerUsername || null,
     group.minSol,
     group.minMcap,
+    url,
   ]);
 }
 
@@ -193,19 +198,22 @@ async function upsertTelegramGroup(group) {
  *  ownerUserId: string,
  *  ownerUsername?: string|null,
  *  minSol: number,
- *  minMcap: number
+ *  minMcap: number,
+ *  groupUrl?: string|null
  * }} group
  */
 async function registerTelegramGroup(group) {
+  const url = group.groupUrl && String(group.groupUrl).trim() ? String(group.groupUrl).trim() : null;
   await getDb().query(`
     INSERT INTO telegram_groups (
-      group_id, group_title, owner_user_id, owner_username, min_sol, min_mcap, is_active, updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, 0, now())
+      group_id, group_title, owner_user_id, owner_username, min_sol, min_mcap, group_url, is_active, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, now())
     ON CONFLICT(group_id) DO UPDATE SET
       group_title = excluded.group_title,
       owner_user_id = excluded.owner_user_id,
       owner_username = excluded.owner_username,
-      updated_at = now()
+      updated_at = now(),
+      group_url = COALESCE(NULLIF(TRIM(excluded.group_url), ''), telegram_groups.group_url)
   `, [
     group.groupId,
     group.groupTitle,
@@ -213,7 +221,22 @@ async function registerTelegramGroup(group) {
     group.ownerUsername || null,
     group.minSol,
     group.minMcap,
+    url,
   ]);
+}
+
+/**
+ * Sets group_url when we learn a non-empty link (e.g. after bot becomes admin).
+ * @param {string} groupId
+ * @param {string|null|undefined} groupUrl
+ */
+async function updateTelegramGroupUrl(groupId, groupUrl) {
+  const u = groupUrl && String(groupUrl).trim() ? String(groupUrl).trim() : '';
+  if (!u) return;
+  await getDb().query(
+    'UPDATE telegram_groups SET group_url = $1, updated_at = now() WHERE group_id = $2',
+    [u, groupId],
+  );
 }
 
 /**
@@ -274,7 +297,7 @@ async function updateTelegramGroupThreshold(groupId, key, value) {
  */
 async function getTelegramGroupById(groupId) {
   const { rows } = await getDb().query(`
-    SELECT group_id, group_title, min_sol, min_mcap, is_active
+    SELECT group_id, group_title, min_sol, min_mcap, is_active, group_url
     FROM telegram_groups
     WHERE group_id = $1
     LIMIT 1
@@ -288,7 +311,7 @@ async function getTelegramGroupById(groupId) {
  */
 async function getTelegramGroupsByOwner(ownerUserId) {
   const { rows } = await getDb().query(`
-    SELECT group_id, group_title, min_sol, min_mcap, is_active
+    SELECT group_id, group_title, min_sol, min_mcap, is_active, group_url
     FROM telegram_groups
     WHERE owner_user_id = $1
     ORDER BY updated_at DESC
@@ -296,12 +319,16 @@ async function getTelegramGroupsByOwner(ownerUserId) {
   return rows;
 }
 
-/** @returns {Array<{group_id: string, min_sol: number, min_mcap: number}>} */
+/**
+ * All active groups across every owner (no owner filter).
+ * @returns {Array<{group_id: string, min_sol: number, min_mcap: number}>}
+ */
 async function getActiveTelegramGroups() {
   const { rows } = await getDb().query(`
     SELECT group_id, min_sol, min_mcap
     FROM telegram_groups
     WHERE is_active = 1
+    ORDER BY group_id
   `);
   return rows;
 }
@@ -324,4 +351,5 @@ module.exports = {
   getTelegramGroupById,
   getTelegramGroupsByOwner,
   getActiveTelegramGroups,
+  updateTelegramGroupUrl,
 };

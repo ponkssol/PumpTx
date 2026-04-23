@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
 const log = require('./logger');
 const { formatMarketCapUsd } = require('./format-mc');
@@ -12,6 +13,7 @@ const {
   getTelegramGroupById,
   getTelegramGroupsByOwner,
   getActiveTelegramGroups,
+  updateTelegramGroupUrl,
 } = require('./db');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -24,13 +26,93 @@ const BOT_BRAND = 'PumpTX';
 const defaultGroupMinSol = Number(process.env.DEFAULT_GROUP_MIN_SOL || process.env.MIN_BUY_SOL || 0);
 const defaultGroupMinMcap = Number(process.env.DEFAULT_GROUP_MIN_MCAP || 0);
 const welcomeImageUrl = process.env.TELEGRAM_WELCOME_IMAGE_URL || '';
-const settingImageUrl = process.env.TELEGRAM_SETTING_IMAGE_URL || welcomeImageUrl;
+const settingImageUrlEnv = process.env.TELEGRAM_SETTING_IMAGE_URL || '';
 const groupReadyImageUrl = process.env.TELEGRAM_GROUP_READY_IMAGE_URL || '';
+
+const publicDir = path.join(__dirname, '../public');
+const publicWelcomePng = path.join(publicDir, 'welcome.png');
+const publicSettingPng = path.join(publicDir, 'setting.png');
+const publicSettingsPng = path.join(publicDir, 'settings.png');
+
+/** @param {string} envVal @param {string} localFile @returns {string} */
+function resolveCardImageEnvOrLocal(envVal, localFile) {
+  const e = envVal && String(envVal).trim();
+  if (e) return e;
+  if (localFile && fs.existsSync(localFile)) return localFile;
+  return '';
+}
+
+function getWelcomeCardImage() {
+  return resolveCardImageEnvOrLocal(welcomeImageUrl, publicWelcomePng);
+}
+
+function getSettingCardImage() {
+  const fromEnv = settingImageUrlEnv && String(settingImageUrlEnv).trim();
+  if (fromEnv) return fromEnv;
+  if (fs.existsSync(publicSettingPng)) return publicSettingPng;
+  if (fs.existsSync(publicSettingsPng)) return publicSettingsPng;
+  const w = welcomeImageUrl && String(welcomeImageUrl).trim();
+  return w || '';
+}
+
+/** Group join card: optional dedicated env, else same as welcome card. */
+function getGroupReadyCardImage() {
+  const g = groupReadyImageUrl && String(groupReadyImageUrl).trim();
+  if (g) return g;
+  return getWelcomeCardImage();
+}
+
+const WELCOME_CARD_CAPTION = `👋 <b>Welcome to ${BOT_BRAND}</b>\n\nGet fast BUY alerts with per-group filters.\nAdd the bot to your group, then continue setup.\n\nPlease set the bot as admin for reliable alert delivery.`;
+
+/** @param {string|null} username */
+function buildWelcomeInlineKeyboard(username) {
+  const addUrl = buildAddToGroupUrl(username);
+  const keyboard = [];
+  if (addUrl) {
+    keyboard.push([{ text: '➕ Add me to your Group', url: addUrl }]);
+  }
+  keyboard.push([{ text: '⚙️ Open Setting', callback_data: 'private_open_group_list' }]);
+  return { inline_keyboard: keyboard };
+}
+
+/**
+ * @param {number|string} chatIdValue
+ * @param {string|null} username
+ */
+async function sendWelcomeRichCard(chatIdValue, username) {
+  return sendRichCard(chatIdValue, WELCOME_CARD_CAPTION, {
+    imageUrl: getWelcomeCardImage(),
+    reply_markup: buildWelcomeInlineKeyboard(username),
+  });
+}
 const pendingSettingsInput = new Map();
 /** @type {Map<string, { groupChatId: string|number, messageId: number, userId: string|number, expiresAt: number }>} */
 const pendingGroupReadyUi = new Map();
 /** @type {Map<string, string>} messageKey -> token (at most one active token per group greeting message) */
 const pendingGroupReadyUiByMessageKey = new Map();
+/** Last "Welcome to PumpTX" card message_id per group (removed before join success card). */
+/** @type {Map<string, number>} */
+const lastGroupWelcomeMessageId = new Map();
+
+/**
+ * @param {string|number} chatIdValue
+ * @param {unknown} sent
+ */
+function rememberGroupWelcomeMessage(chatIdValue, sent) {
+  if (!sent || typeof sent !== 'object' || typeof sent.message_id !== 'number') return;
+  lastGroupWelcomeMessageId.set(String(chatIdValue), sent.message_id);
+}
+
+/**
+ * Deletes the stored welcome card in this group (if any), so it does not sit above the join success message.
+ * @param {string|number} chatIdValue
+ */
+async function deleteStoredGroupWelcomeIfAny(chatIdValue) {
+  const mid = lastGroupWelcomeMessageId.get(String(chatIdValue));
+  if (typeof mid !== 'number') return;
+  lastGroupWelcomeMessageId.delete(String(chatIdValue));
+  await deleteMessageSafe(chatIdValue, mid);
+}
 
 /** @param {string|number} groupChatId @param {number} messageId */
 function groupReadyMessageKey(groupChatId, messageId) {
@@ -68,6 +150,29 @@ async function getBotUsername() {
     const me = await bot.getMe();
     return me && me.username ? String(me.username) : null;
   } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Resolves a stable web/open link for the group: public supergroups use t.me/username;
+ * private groups use the primary invite link (requires bot admin).
+ * @param {string|number} groupChatId
+ * @param {{ username?: string }} chat
+ * @returns {Promise<string|null>}
+ */
+async function resolveTelegramGroupUrl(groupChatId, chat) {
+  if (!bot) return null;
+  const raw = chat && chat.username ? String(chat.username).replace(/^@/, '') : '';
+  if (raw) {
+    return `https://t.me/${encodeURIComponent(raw)}`;
+  }
+  try {
+    const link = await bot.exportChatInviteLink(groupChatId);
+    return link ? String(link).trim() : null;
+  } catch (e) {
+    const msg = e && e.message ? String(e.message) : String(e);
+    log.warn(`exportChatInviteLink failed for ${groupChatId}: ${msg}`);
     return null;
   }
 }
@@ -129,6 +234,7 @@ function parseMarketCapInput(raw) {
  */
 async function registerGroup(chat, from) {
   const groupId = String(chat.id);
+  const groupUrl = await resolveTelegramGroupUrl(chat.id, chat);
   await registerTelegramGroup({
     groupId,
     groupTitle: chat.title || groupId,
@@ -136,6 +242,7 @@ async function registerGroup(chat, from) {
     ownerUsername: from && from.username ? String(from.username) : null,
     minSol: defaultGroupMinSol,
     minMcap: defaultGroupMinMcap,
+    groupUrl,
   });
   return groupId;
 }
@@ -223,21 +330,7 @@ function buildPrivateStartLinks(username, groupId, readyToken) {
  * @param {string|null} username
  */
 async function sendPrivateWelcomeCard(privateChatId, username) {
-  const addUrl = buildAddToGroupUrl(username);
-  const keyboard = [];
-  if (addUrl) {
-    keyboard.push([{ text: '➕ Add me to your Group', url: addUrl }]);
-  }
-  keyboard.push([{ text: '⚙️ Open Setting', callback_data: 'private_open_group_list' }]);
-
-  await sendRichCard(
-    privateChatId,
-    `👋 <b>Welcome to ${BOT_BRAND}</b>\n\nGet fast BUY alerts with per-group filters.\nAdd the bot to your group, then continue setup.\n\nPlease set the bot as admin for reliable alert delivery.`,
-    {
-      imageUrl: welcomeImageUrl,
-      reply_markup: { inline_keyboard: keyboard },
-    },
-  );
+  await sendWelcomeRichCard(privateChatId, username);
 }
 
 /**
@@ -254,7 +347,7 @@ async function sendPrivateSettingCard(privateChatId, username) {
     privateChatId,
     `⚙️ <b>${BOT_BRAND} Settings</b>\n\nSelect a group to configure:\n• Min Buy Solana\n• Min Market Cap (USD)`,
     {
-      imageUrl: settingImageUrl,
+      imageUrl: getSettingCardImage(),
       reply_markup: { inline_keyboard: keyboard },
     },
   );
@@ -262,15 +355,15 @@ async function sendPrivateSettingCard(privateChatId, username) {
 
 /**
  * @param {number|string} chatIdValue
- * @param {{ group_id: string, group_title: string, min_sol: number, min_mcap: number, is_active: number }} group
+ * @param {{ group_id: string, group_title: string, min_sol: number, min_mcap: number, is_active: number, group_url?: string|null }} group
  */
 async function sendPrivateSettingMenu(chatIdValue, group) {
   const minSol = Number(group && group.min_sol ? group.min_sol : 0);
   const minMcap = Number(group && group.min_mcap ? group.min_mcap : 0);
-  const statusText = Number(group && group.is_active) === 1 ? 'active' : 'inactive';
+  const statusText = Number(group && group.is_active) === 1 ? 'active' : 'inactive'; 
   await bot.sendMessage(
     chatIdValue,
-    `⚙️ <b>${BOT_BRAND} Settings</b>\nGroup: <b>${escHtml(group.group_title || group.group_id)}</b>\nStatus: <b>${statusText}</b>\n\n💸 Min Buy Solana: <code>${minSol}</code>\n📈 Min Market Cap (USD): <code>${minMcap}</code>`,
+    `⚙️ <b>${BOT_BRAND} Settings</b>\nGroup: <b>${escHtml(group.group_title || group.group_id)}</b>\nStatus: <b>${statusText}</b>\n💸 Min Buy Solana: <code>${minSol}</code>\n📈 Min Market Cap (USD): <code>${minMcap}</code>`,
     {
       parse_mode: 'HTML',
       reply_markup: {
@@ -360,10 +453,12 @@ function isChatUnavailableError(err) {
  */
 async function sendPrivateGroupPicker(privateChatId, ownerUserId) {
   const groups = await getTelegramGroupsByOwner(String(ownerUserId));
+  const settingImg = getSettingCardImage();
   if (!groups.length) {
-    await bot.sendMessage(
+    await sendRichCard(
       privateChatId,
       'No groups found for this account.\nAdd the bot to a group first, then open settings again.',
+      { imageUrl: settingImg },
     );
     return;
   }
@@ -373,10 +468,13 @@ async function sendPrivateGroupPicker(privateChatId, ownerUserId) {
       callback_data: `pick_group:${g.group_id}`,
     },
   ]);
-  await bot.sendMessage(
+  await sendRichCard(
     privateChatId,
     `Select a group to configure in ${BOT_BRAND}:`,
-    { reply_markup: { inline_keyboard: keyboard } },
+    {
+      imageUrl: settingImg,
+      reply_markup: { inline_keyboard: keyboard },
+    },
   );
 }
 
@@ -395,13 +493,14 @@ async function ownerHasGroupAccess(ownerUserId, groupId) {
  * @param {string} groupId
  */
 async function sendGroupReadyCard(groupChatId, groupId, fromUserId) {
+  await deleteStoredGroupWelcomeIfAny(groupChatId);
   const username = await getBotUsername();
   const keyboard = [[{ text: '⚙️ Setting', callback_data: `group_open_setting:${groupId}` }]];
   const sent = await sendRichCard(
     groupChatId,
     `✅ <b>${BOT_BRAND} added to the group successfully!</b>\n\nStatus: <b>inactive</b>. Open Settings to configure and activate this group.`,
     {
-      imageUrl: groupReadyImageUrl,
+      imageUrl: getGroupReadyCardImage(),
       reply_markup: { inline_keyboard: keyboard },
     },
   );
@@ -515,7 +614,8 @@ async function notify(buyData, imagePathOrBuffer) {
         log.warn(`Telegram target ${group.group_id} was disabled: ${err.message}`);
         continue;
       }
-      throw err;
+      // Do not abort the whole broadcast: one failing chat must not block other owners' groups.
+      log.warn(`Telegram send failed for group ${group.group_id}: ${err && err.message ? err.message : err}`);
     }
   }
   if (chatId && !sentTargets.has(String(chatId))) {
@@ -549,6 +649,7 @@ function setupTelegramGroupLifecycle() {
       const groupId = String(chat.id);
       const groupTitle = chat.title || groupId;
       if (newStatus === 'member' || newStatus === 'administrator') {
+        const groupUrl = await resolveTelegramGroupUrl(chat.id, chat);
         await registerTelegramGroup({
           groupId,
           groupTitle,
@@ -556,6 +657,7 @@ function setupTelegramGroupLifecycle() {
           ownerUsername: from && from.username ? String(from.username) : null,
           minSol: defaultGroupMinSol,
           minMcap: defaultGroupMinMcap,
+          groupUrl,
         });
       }
       if (
@@ -652,7 +754,11 @@ function setupTelegramGroupLifecycle() {
           await sendPrivateWelcomeCard(msg.chat.id, botUsername);
           return;
         }
-        if (command === 'setting' || command === 'menu') {
+        if (command === 'menu') {
+          await sendPrivateWelcomeCard(msg.chat.id, botUsername);
+          return;
+        }
+        if (command === 'setting') {
           await sendPrivateSettingCard(msg.chat.id, botUsername);
           await sendPrivateGroupPicker(msg.chat.id, userIdValue);
         }
@@ -661,18 +767,49 @@ function setupTelegramGroupLifecycle() {
 
       if (chatType !== 'group' && chatType !== 'supergroup') return;
 
-      if (command === 'start' && typeof msg.message_id === 'number') {
-        await deleteMessageSafe(msg.chat.id, msg.message_id);
-      }
-
       const members = Array.isArray(msg.new_chat_members) ? msg.new_chat_members : [];
       if (members.length) {
         const id = await getBotId();
         if (id && members.some((m) => m && m.id === id)) {
+          await deleteStoredGroupWelcomeIfAny(msg.chat.id);
           const groupId = await registerGroup(msg.chat, msg.from || {});
           await sendGroupReadyCard(msg.chat.id, groupId, (msg.from && msg.from.id) || 0);
           return;
         }
+      }
+
+      if (command === 'start') {
+        if (typeof msg.message_id === 'number') {
+          await deleteMessageSafe(msg.chat.id, msg.message_id);
+        }
+        const botUsername = await getBotUsername();
+        const sent = await sendWelcomeRichCard(msg.chat.id, botUsername);
+        rememberGroupWelcomeMessage(msg.chat.id, sent);
+        return;
+      }
+      if (command === 'menu') {
+        const botUsername = await getBotUsername();
+        const sent = await sendWelcomeRichCard(msg.chat.id, botUsername);
+        rememberGroupWelcomeMessage(msg.chat.id, sent);
+        return;
+      }
+      if (command === 'setting') {
+        const botUsername = await getBotUsername();
+        const gid = String(msg.chat.id);
+        const addUrl = buildAddToGroupUrl(botUsername);
+        const settingKb = [[{ text: '⚙️ Setting', callback_data: `group_open_setting:${gid}` }]];
+        if (addUrl) {
+          settingKb.push([{ text: '➕ Add me to your Group', url: addUrl }]);
+        }
+        await sendRichCard(
+          msg.chat.id,
+          `⚙️ <b>${BOT_BRAND} Settings</b>\n\nConfigure this group in private chat — tap Setting below.`,
+          {
+            imageUrl: getSettingCardImage(),
+            reply_markup: { inline_keyboard: settingKb },
+          },
+        );
+        return;
       }
     } catch (_) {
       // Ignore message handler errors so listener keeps running.
@@ -708,6 +845,13 @@ function setupTelegramGroupLifecycle() {
             return;
           }
           await activateTelegramGroup(groupId);
+          try {
+            const tchat = await bot.getChat(groupId);
+            const url = await resolveTelegramGroupUrl(groupId, tchat);
+            if (url) await updateTelegramGroupUrl(groupId, url);
+          } catch (_) {
+            // ignore: link may already exist from join, or export still not allowed
+          }
           const updated = await getTelegramGroupById(groupId);
           await bot.answerCallbackQuery(query.id, { text: 'Group activated.' });
           if (updated) await sendPrivateSettingMenu(chatIdValue, updated);
@@ -848,98 +992,30 @@ function setupTelegramGroupLifecycle() {
           await bot.answerCallbackQuery(query.id, { text: 'Message unavailable. Re-add the bot or ask an admin to post setup again.' }).catch(() => {});
           return;
         }
-        const token = createGroupReadyToken();
-        const { https: httpsOpenUrl } = buildPrivateStartLinks(username, groupId, token);
+
+        await deleteStoredGroupWelcomeIfAny(chatIdValue);
+        revokeGroupReadyTokensForMessage(chatIdValue, msg.message_id);
+        await deleteMessageSafe(chatIdValue, msg.message_id);
+
+        const { https: httpsOpenUrl } = buildPrivateStartLinks(username, groupId);
         if (!httpsOpenUrl) {
-          pendingGroupReadyUi.delete(token);
           await bot.answerCallbackQuery(query.id, { text: 'Bot username missing; cannot open private chat.' }).catch(() => {});
           return;
         }
-        rememberGroupReadyMessage(token, {
-          groupChatId: chatIdValue,
-          messageId: msg.message_id,
-          userId: fromId,
-        });
+
         await bot.answerCallbackQuery(query.id, { text: 'Continue in private chat. Use Open if Desktop did not switch chats.' }).catch(() => {});
 
-        if (httpsOpenUrl) {
-          const openKeyboard = {
-            inline_keyboard: [[{ text: `⚙️ Open ${BOT_BRAND} (private)`, url: httpsOpenUrl }]],
-          };
-          try {
-            await bot.sendMessage(
-              fromId,
-              `Tap the button below to open <b>${BOT_BRAND}</b> private chat for this group.`,
-              { parse_mode: 'HTML', reply_markup: openKeyboard },
-            );
-          } catch (_) {
-            // ignore: user may not have started the bot yet; group message still has Open URL.
-          }
-          const edited = await (async () => {
-            try {
-              if (msg.photo && msg.photo.length) {
-                const cap = msg.caption || `✅ <b>${BOT_BRAND} added to the group successfully!</b>`;
-                await bot.editMessageCaption(
-                  `${cap}\n\nTap <b>Open</b> below to continue in private chat (Telegram Desktop).`,
-                  {
-                    chat_id: chatIdValue,
-                    message_id: msg.message_id,
-                    parse_mode: 'HTML',
-                    reply_markup: openKeyboard,
-                  },
-                );
-                return true;
-              }
-              const text = msg.text || `${BOT_BRAND}`;
-              await bot.editMessageText(
-                `${text}\n\nTap <b>Open</b> below to continue in private chat (Telegram Desktop).`,
-                {
-                  chat_id: chatIdValue,
-                  message_id: msg.message_id,
-                  parse_mode: 'HTML',
-                  reply_markup: openKeyboard,
-                },
-              );
-              return true;
-            } catch (_) {
-              return false;
-            }
-          })();
-
-          if (!edited) {
-            revokeGroupReadyTokensForMessage(chatIdValue, msg.message_id);
-            await deleteMessageSafe(chatIdValue, msg.message_id);
-            /** @type {{ message_id: number }|null} */
-            let resent = null;
-            if (groupReadyImageUrl) {
-              try {
-                resent = await bot.sendPhoto(chatIdValue, groupReadyImageUrl, {
-                  caption: `✅ <b>${BOT_BRAND}</b>\n\nTap <b>Open</b> below to continue in private chat.`,
-                  parse_mode: 'HTML',
-                  reply_markup: openKeyboard,
-                });
-              } catch (_) {
-                resent = await bot.sendMessage(
-                  chatIdValue,
-                  `${BOT_BRAND}: tap Open to continue in private chat (Telegram Desktop).`,
-                  { parse_mode: 'HTML', reply_markup: openKeyboard },
-                ).catch(() => null);
-              }
-            } else {
-              resent = await bot.sendMessage(
-                chatIdValue,
-                `${BOT_BRAND}: tap Open to continue in private chat (Telegram Desktop).`,
-                { parse_mode: 'HTML', reply_markup: openKeyboard },
-              ).catch(() => null);
-            }
-            if (resent && typeof resent.message_id === 'number') {
-              rememberGroupReadyMessage(token, {
-                groupChatId: chatIdValue,
-                messageId: resent.message_id,
-                userId: fromId,
-              });
-            }
-          }
+        const openKeyboard = {
+          inline_keyboard: [[{ text: `⚙️ Open ${BOT_BRAND} (private)`, url: httpsOpenUrl }]],
+        };
+        try {
+          await bot.sendMessage(
+            fromId,
+            `Tap the button below to open <b>${BOT_BRAND}</b> private chat for this group.`,
+            { parse_mode: 'HTML', reply_markup: openKeyboard },
+          );
+        } catch (_) {
+          // ignore: user may not have started the bot yet.
         }
         return;
       }
