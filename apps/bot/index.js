@@ -6,7 +6,7 @@ const { initDb, saveTx, updateStats, updateTweetStatus, updateTelegramStatus } =
 const { parseBuyTx } = require('./src/parser');
 const { shouldNotify } = require('./src/filter');
 const { generateImage } = require('./src/image-generator');
-const { notify } = require('./src/telegram');
+const { notify, setupTelegramGroupLifecycle } = require('./src/telegram');
 const { notifyDiscord, isDiscordWebhookEnabled } = require('./src/discord');
 const { tweet } = require('./src/twitter');
 const { startListener } = require('./src/listener');
@@ -25,8 +25,9 @@ PumpTx v1.0.0 — PumpFun Buy Monitor + Dashboard
 /** @returns {string[]} */
 function requiredEnv() {
   return [
-    'SOLANA_RPC_HTTPS', 'SOLANA_RPC_WSS', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID',
-    'TWITTER_API_IO_KEY', 'TWITTER_BASE_URL', 'NEXT_PUBLIC_BASE_URL', 'BOT_PORT', 'MIN_BUY_SOL', 'COOLDOWN_MS', 'BOT_BASE_URL',
+    'SOLANA_RPC_HTTPS', 'SOLANA_RPC_WSS', 'TELEGRAM_BOT_TOKEN',
+    'TWITTER_API_IO_KEY', 'TWITTER_BASE_URL', 'NEXT_PUBLIC_BASE_URL', 'BOT_PORT',
+    'MIN_BUY_SOL', 'COOLDOWN_MS', 'BOT_BASE_URL', 'DATABASE_URL',
   ];
 }
 
@@ -67,28 +68,28 @@ async function onBuy(raw) {
     log.warn(`Image generation failed: ${e.message}`);
   }
   try {
-    saveTx(row, imgUrl, imgPath);
-    updateStats(row.solSpent);
+    await saveTx(row, imgUrl, imgPath);
+    await updateStats(row.solSpent);
   } catch (e) {
     log.error(`DB save failed: ${e.message}`);
   }
   await Promise.all([
     (async () => {
       try {
-        await notify(row, imgBuffer || imgPath);
-        updateTelegramStatus(row.signature, 1);
+        const sent = await notify(row, imgBuffer || imgPath);
+        await updateTelegramStatus(row.signature, sent > 0 ? 1 : 0);
       } catch (e) {
         log.error(`Telegram failed: ${e.message}`);
-        try { updateTelegramStatus(row.signature, 0); } catch (_) { /* ignore */ }
+        try { await updateTelegramStatus(row.signature, 0); } catch (_) { /* ignore */ }
       }
     })(),
     (async () => {
       try {
         const { posted } = await tweet(row, imgBuffer || imgPath);
-        if (posted) updateTweetStatus(row.signature, 1);
+        if (posted) await updateTweetStatus(row.signature, 1);
       } catch (e) {
         log.error(`Twitter failed: ${e.message}`);
-        try { updateTweetStatus(row.signature, 0); } catch (_) { /* ignore */ }
+        try { await updateTweetStatus(row.signature, 0); } catch (_) { /* ignore */ }
       }
     })(),
     (async () => {
@@ -105,10 +106,11 @@ async function onBuy(raw) {
 async function main() {
   console.log(banner);
   validateEnv();
+  setupTelegramGroupLifecycle();
   if (isDiscordWebhookEnabled()) {
     log.info('Discord webhook: enabled (BUY alerts will post to Discord)');
   }
-  initDb();
+  await initDb();
   if (String(process.env.PUMPTX_SHARE_IMAGE_MODE || 'disk').toLowerCase() === 'memory') {
     log.info('Share card: PUMPTX_SHARE_IMAGE_MODE=memory (PNG not written to disk; DB image_url empty)');
   }
