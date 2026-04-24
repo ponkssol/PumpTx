@@ -25,13 +25,20 @@ PumpTx v1.0.0 — PumpFun Buy Monitor + Dashboard
 /** @returns {string[]} */
 function requiredEnv() {
   return [
-    'SOLANA_RPC_HTTPS', 'SOLANA_RPC_WSS', 'TELEGRAM_BOT_TOKEN',
+    'SOLANA_RPC_HTTPS', 'SOLANA_RPC_WSS',
     'TWITTER_API_IO_KEY', 'TWITTER_BASE_URL', 'NEXT_PUBLIC_BASE_URL', 'BOT_PORT',
     'MIN_BUY_SOL', 'COOLDOWN_MS', 'BOT_BASE_URL', 'DATABASE_URL',
   ];
 }
 
 function validateEnv() {
+  const hasTelegramToken =
+    String(process.env.TELEGRAM_BOT_TOKEN_GENERAL || '').trim()
+    || String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  if (!hasTelegramToken) {
+    log.error('Missing env: set TELEGRAM_BOT_TOKEN_GENERAL and/or TELEGRAM_BOT_TOKEN');
+    process.exit(1);
+  }
   const miss = requiredEnv().filter((k) => !process.env[k]);
   if (miss.length) {
     log.error(`Missing env: ${miss.join(', ')}`);

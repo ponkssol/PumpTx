@@ -77,7 +77,20 @@ async function initDb() {
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS fdv_usd DOUBLE PRECISION DEFAULT 0;
     ALTER TABLE telegram_groups ALTER COLUMN is_active SET DEFAULT 0;
     ALTER TABLE telegram_groups ADD COLUMN IF NOT EXISTS group_url TEXT;
+    ALTER TABLE telegram_groups ADD COLUMN IF NOT EXISTS welcome_message_id INTEGER;
   `);
+}
+
+/**
+ * @param {string} groupId
+ * @param {number|null|undefined} messageId
+ */
+async function setTelegramGroupWelcomeMessageId(groupId, messageId) {
+  const mid = messageId == null || !Number.isFinite(Number(messageId)) ? null : Math.floor(Number(messageId));
+  await getDb().query(
+    'UPDATE telegram_groups SET welcome_message_id = $2, updated_at = now() WHERE group_id = $1',
+    [String(groupId), mid],
+  );
 }
 
 /**
@@ -207,7 +220,7 @@ async function registerTelegramGroup(group) {
   await getDb().query(`
     INSERT INTO telegram_groups (
       group_id, group_title, owner_user_id, owner_username, min_sol, min_mcap, group_url, is_active, updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, now())
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 1, now())
     ON CONFLICT(group_id) DO UPDATE SET
       group_title = excluded.group_title,
       owner_user_id = excluded.owner_user_id,
@@ -297,7 +310,7 @@ async function updateTelegramGroupThreshold(groupId, key, value) {
  */
 async function getTelegramGroupById(groupId) {
   const { rows } = await getDb().query(`
-    SELECT group_id, group_title, min_sol, min_mcap, is_active, group_url
+    SELECT group_id, group_title, min_sol, min_mcap, is_active, group_url, welcome_message_id
     FROM telegram_groups
     WHERE group_id = $1
     LIMIT 1
@@ -352,4 +365,5 @@ module.exports = {
   getTelegramGroupsByOwner,
   getActiveTelegramGroups,
   updateTelegramGroupUrl,
+  setTelegramGroupWelcomeMessageId,
 };

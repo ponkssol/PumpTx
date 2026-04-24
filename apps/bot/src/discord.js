@@ -6,6 +6,26 @@ const { formatSolAmount } = require('./format-sol');
 
 const AUTHOR_GITHUB_URL = 'https://github.com/ponkssol';
 
+const rawDiscordMin = process.env.DISCORD_MIN_SOL;
+const discordMinSol =
+  rawDiscordMin === undefined || String(rawDiscordMin).trim() === ''
+    ? Number(process.env.MIN_BUY_SOL || 0)
+    : Number(rawDiscordMin);
+const discordMinMcap = Number(process.env.DISCORD_MIN_MCAP || 0);
+
+/**
+ * @param {object} buyData
+ * @returns {boolean}
+ */
+function shouldPostDiscord(buyData) {
+  if (!buyData) return false;
+  const sol = Number(buyData.solSpent || 0);
+  const mcap = Number(buyData.marketCapUsd || 0);
+  if (sol < discordMinSol) return false;
+  if (mcap < discordMinMcap) return false;
+  return true;
+}
+
 /** Resolves webhook URL from env (read at send time so .env is always current after restart). */
 function getDiscordWebhookUrl() {
   let u = (process.env.DISCORD_WEBHOOK_URL || process.env.DISCORD_WEBHOOK || '').trim();
@@ -111,6 +131,7 @@ function footerText(buyData) {
 async function notifyDiscord(buyData, imagePathOrBuffer, publicImageUrl) {
   const webhookUrl = getDiscordWebhookUrl();
   if (!webhookUrl) return;
+  if (!shouldPostDiscord(buyData)) return;
 
   const base = (process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '');
   const detailUrl = `${base}/tx/${buyData.signature}`;
@@ -172,4 +193,4 @@ async function notifyDiscord(buyData, imagePathOrBuffer, publicImageUrl) {
   }
 }
 
-module.exports = { notifyDiscord, isDiscordWebhookEnabled };
+module.exports = { notifyDiscord, isDiscordWebhookEnabled, shouldPostDiscord };
