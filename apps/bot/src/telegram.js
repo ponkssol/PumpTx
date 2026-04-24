@@ -591,7 +591,7 @@ async function sendGroupReadyCard(groupChatId, groupId, fromUserId) {
   const keyboard = [[{ text: '⚙️ Setting', callback_data: `group_open_setting:${groupId}` }]];
   const sent = await sendRichCard(
     groupChatId,
-    `✅ <b>${BOT_BRAND} added to the group successfully!</b>\n\nStatus: <b>active</b> (BUY alerts on while thresholds are met). Open Settings to change Min SOL / Min MCAP or pause.`,
+    `✅ <b>${BOT_BRAND} added to the group successfully!</b>\n\nStatus: <b>inactive</b> — no BUY alerts until you <b>Start Group</b> in private settings. Open <b>Setting</b> or <b>Open (private)</b> to configure and activate.`,
     {
       imageUrl: getGroupReadyCardImage(),
       reply_markup: { inline_keyboard: keyboard },

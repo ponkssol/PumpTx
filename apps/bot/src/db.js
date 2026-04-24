@@ -204,7 +204,7 @@ async function upsertTelegramGroup(group) {
 }
 
 /**
- * Registers group if new and re-activates if existing without overriding existing thresholds.
+ * Registers group; new rows are is_active=0 until the owner uses “Start Group” in private settings.
  * @param {{
  *  groupId: string,
  *  groupTitle: string,
@@ -220,7 +220,7 @@ async function registerTelegramGroup(group) {
   await getDb().query(`
     INSERT INTO telegram_groups (
       group_id, group_title, owner_user_id, owner_username, min_sol, min_mcap, group_url, is_active, updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 1, now())
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, now())
     ON CONFLICT(group_id) DO UPDATE SET
       group_title = excluded.group_title,
       owner_user_id = excluded.owner_user_id,
