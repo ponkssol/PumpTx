@@ -1,4 +1,4 @@
-const { LAMPORTS_PER_SOL } = require('@solana/web3.js');
+const { LAMPORTS_PER_SOL } = require('./load-solana-web3');
 
 const PUMP_FUN = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
 const WSOL = 'So11111111111111111111111111111111111111112';

@@ -1,4 +1,4 @@
-const { Connection, PublicKey } = require('@solana/web3.js');
+const { Connection, PublicKey } = require('./load-solana-web3');
 const log = require('./logger');
 
 const PUMP = new PublicKey('6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P');
