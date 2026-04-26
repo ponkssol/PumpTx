@@ -11,6 +11,7 @@ const { notifyDiscord, isDiscordWebhookEnabled } = require('./src/discord');
 const { tweet } = require('./src/twitter');
 const { startListener } = require('./src/listener');
 const { enrichPumpMetadata } = require('./src/token-meta');
+const { startGeneratedCleanupJob } = require('./src/generated-cleanup-job');
 
 const banner = `
 ██████╗ ██╗   ██╗███╗   ███╗██████╗ ████████╗██╗  ██╗
@@ -118,6 +119,7 @@ async function main() {
     log.info('Discord webhook: enabled (BUY alerts will post to Discord)');
   }
   await initDb();
+  const stopGeneratedCleanupJob = startGeneratedCleanupJob();
   if (String(process.env.PUMPTX_SHARE_IMAGE_MODE || 'disk').toLowerCase() === 'memory') {
     log.info('Share card: PUMPTX_SHARE_IMAGE_MODE=memory (PNG not written to disk; DB image_url empty)');
   }
@@ -141,6 +143,7 @@ async function main() {
   const stop = await startListener(onBuy);
   const shutdown = async () => {
     log.warn('Shutting down...');
+    stopGeneratedCleanupJob();
     await stop();
     server.close(() => process.exit(0));
   };
